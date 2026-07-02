@@ -10,7 +10,6 @@ import LeftPanel from './left-panel';
 import LoadControls from './load-controls';
 import PopupPanel from './popup-panel';
 import SelectedNode from './selected-node';
-import { version as appVersion } from '../../package.json';
 
 class App extends React.Component<{ observer: Observer }> {
     state: ObserverData = null;
@@ -45,14 +44,8 @@ class App extends React.Component<{ observer: Observer }> {
         const xrActive = this.state?.runtime?.xrActive;
         return <div id="application-container">
             <Container id="panel-left" flex resizable='right' resizeMin={220} resizeMax={800} hidden={xrActive}>
-                <div className="header" style={{ display: 'none' }}>
-                    <div id="title">
-                        <img src={'static/playcanvas-logo.png'}/>
-                        <div>{`MODEL VIEWER v${appVersion}`}</div>
-                    </div>
-                </div>
                 <div id="panel-toggle">
-                    <img src={'static/playcanvas-logo.png'}/>
+                    <img src={'static/mcs-logo.png'}/>
                 </div>
                 <LeftPanel observerData={this.state} setProperty={this._setStateProperty} />
             </Container>

@@ -31,17 +31,31 @@ npm run develop     # rollup watch + serve on localhost:3000
 # load an asset: http://localhost:3000/?load=<glb url>
 ```
 
-## UI direction — Marmoset Toolbag viewer (Doug)
-Target the feel of **Marmoset Toolbag's viewer**: a pro look-dev tool — **viewport-centric**, dark and
-flat, **docked side panels** (scene/hierarchy one side, properties/material/render the other) instead of
-scattered floating popups, a slim **top toolbar** for view/render/lighting, and restrained, legible
-controls. The card overlay reads as a clean Marmoset-style **info/property panel** (name / deck /
-rarity / poly·anim·material stats). Keep it premium and calm — not the busy default model-viewer chrome.
+## UI SPEC — the minimal Marmoset **Viewer** (Doug, from reference images in his Downloads)
+NOT the Toolbag *app* (no toolbar, no docks, no scene-tree). The **embeddable Marmoset Viewer**:
+clean full viewport + gradient bg, everything else is minimal overlays.
+
+- **Top-right button column** (vertical icon stack; the model title sits above it):
+  1. **Logo** (top) — the MegaCity light mark (`static/mcs-logo.png`) — **click → megacity.studio**.
+  2. **Fullscreen** toggle.
+  3. **Passes** — toggles the material-pass view: a diagonal wipe across the model labeled
+     **Normals · Albedo · Reflectivity · Gloss · Topology** (Topology = wireframe), with
+     **Triangles / Vertices** stats bottom-left. *(Advanced — real render passes.)*
+  4. **Help** — opens the modal.
+- **Bottom: animation play-controls bar** (full width): speed (1.0x) left · **play/pause** · **scrub
+  timeline** with a playhead · **bottom-right = the animation dropdown** (pick the clip, e.g. "Flying Idle").
+- **Help modal** (rebrand Marmoset's): control legend — **rotate** (LMB drag) · **zoom** (wheel) ·
+  **reset camera** (dbl-click) · **rotate lights** (shift+drag); MegaCity wordmark + megacity.studio link.
+  **NO "move"** — Doug: *rotation + zoom only*.
+- **Camera: ORBIT ONLY** — rotate + zoom. **No WASD / move / fly / directional.** Remove fly mode.
+- **Strip:** the left scene/settings panel + header (viewer shows ONE deck asset — no tree needed).
+- **Card framing (MCS-specific):** the title area carries deck-card metadata (name / deck / rarity),
+  reusing the stack's `.card`/`.card-name`/`.card-idx`/`.card-desc` design + `--card-grad`.
 
 ## Status
-- Forked + oriented + **primed** (2026-07-01, builds clean).
-- **Tokens matched to the LIVE megacity.group/stack CSS** (dark + light: ink/panel/gold/alpha/building/
-  planned/live, --card-grad, --glow1/2, --grid, --grain, --shadow; Archivo variable + IBM Plex Mono).
-- **Next (CLAUDE.Design):** the Marmoset-style layout redesign (dock the panels + top toolbar), the
-  card framing (reuse the stack's `.card`/`.card-name`/`.card-idx`/`.card-desc` design + `--card-grad`),
-  logo/favicon swap, and deck-asset loading (`?load=`).
+- Forked + **primed** + **tokens matched to the live megacity.group/stack CSS** (dark+light).
+- **DONE (2026-07-02):** logo → `static/mcs-logo.png` (the light mark); **header removed**; the
+  toolbar+docks rough-in was dropped (wrong Marmoset — it's the Viewer, not the app).
+- **NEXT (CLAUDE.Design polish):** build the top-right button column (logo→web / fullscreen / passes /
+  help), the passes render mode, the branded help modal, the bottom anim bar + dropdown, orbit-only
+  camera, strip the left panel, and the card framing. Skin/tokens/logo are in place.
