@@ -1886,9 +1886,11 @@ class Viewer {
     }
 
     clearCta() {
-        document.querySelector('#panel-left').classList.add('no-cta');
-        document.querySelector('#application-canvas').classList.add('no-cta');
-        document.querySelector('.load-button-panel').classList.add('hide');
+        // null-guarded: the MCS fork removed #panel-left and the load-button-panel, and an
+        // unguarded querySelector here threw during loadFiles → every model load aborted.
+        document.querySelector('#panel-left')?.classList.add('no-cta');
+        document.querySelector('#application-canvas')?.classList.add('no-cta');
+        document.querySelector('.load-button-panel')?.classList.add('hide');
     }
 
     // add a loaded asset to the scene
