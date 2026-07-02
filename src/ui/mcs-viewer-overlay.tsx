@@ -53,6 +53,8 @@ type Props = { observerData: ObserverData, setProperty: SetProperty };
 type State = {
     passesMode: boolean,
     expandedPass: string | null,
+    passImages: string[],   // captured per-pass images (data URLs), 11 entries when ready
+    capturing: boolean,
     help: boolean,
     menu: boolean,
     fullscreen: boolean
@@ -63,16 +65,36 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
     _onFs: () => void;
 
+    _onSettle: (e: Event) => void;   // orbit/zoom settle → re-capture passes
+
+    // passes-wipe animation state (ported from the Claude Design prototype)
+    _raf = 0;
+
+    _lastT = 0;
+
+    _flyT = 99;         // seconds since passes opened → staggered fly-in
+
+    _expP = 0;          // eased 0..1 expansion progress
+
+    _lastExpIdx = -1;   // last expanded band index (kept during the collapse tween)
+
+    _settleTimer: any = 0;
+
     constructor(props: Props) {
         super(props);
-        this.state = { passesMode: false, expandedPass: null, help: false, menu: false, fullscreen: false };
+        this.state = { passesMode: false, expandedPass: null, passImages: [], capturing: false, help: false, menu: false, fullscreen: false };
     }
 
     componentDidMount(): void {
         this._onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                this.setState({ help: false, menu: false });
-                if (this.state.passesMode) this.setPasses(false);
+                if (this.state.menu || this.state.help) {
+                    this.setState({ help: false, menu: false });
+                } else if (this.state.expandedPass) {
+                    this.setState({ expandedPass: null });   // collapse first
+                } else if (this.state.passesMode) {
+                    this.setPasses(false);                   // then exit passes
+                }
             }
             if (e.key === ' ' && !this.state.help) {
                 e.preventDefault();
@@ -80,14 +102,63 @@ class McsViewerOverlay extends React.Component<Props, State> {
             }
         };
         this._onFs = () => this.setState({ fullscreen: !!document.fullscreenElement });
+        // after orbit/zoom, re-capture the passes so the wipe reflects the new view
+        this._onSettle = () => {
+            if (!this.state.passesMode) return;
+            clearTimeout(this._settleTimer);
+            this._settleTimer = setTimeout(() => this.capture(), 220);
+        };
         window.addEventListener('keydown', this._onKey);
         document.addEventListener('fullscreenchange', this._onFs);
+        window.addEventListener('pointerup', this._onSettle);
+        window.addEventListener('wheel', this._onSettle, { passive: true });
+        this._lastT = performance.now();
+        this._raf = requestAnimationFrame(this._tick);
     }
 
     componentWillUnmount(): void {
         window.removeEventListener('keydown', this._onKey);
         document.removeEventListener('fullscreenchange', this._onFs);
+        window.removeEventListener('pointerup', this._onSettle);
+        window.removeEventListener('wheel', this._onSettle);
+        cancelAnimationFrame(this._raf);
+        clearTimeout(this._settleTimer);
     }
+
+    // drive the fly-in + expand/collapse tweens (JS, not CSS — matches the prototype)
+    _tick = (now: number) => {
+        const dt = Math.min(0.05, (now - this._lastT) / 1000);
+        this._lastT = now;
+        let active = false;
+        if (this.state.passesMode) {
+            if (this._flyT < 1.4) {
+                this._flyT += dt;
+                active = true;
+            }
+            const target = this.state.expandedPass ? 1 : 0;
+            if (this._expP !== target) {
+                this._expP += (target - this._expP) * Math.min(1, dt * 9);
+                if (Math.abs(target - this._expP) < 0.003) this._expP = target;
+                active = true;
+            }
+        }
+        if (active) this.forceUpdate();
+        this._raf = requestAnimationFrame(this._tick);
+    };
+
+    // ask the viewer to render + grab all 11 passes (see viewer.ts capturePasses)
+    capture = async () => {
+        const viewer = (window as any).viewer;
+        if (!viewer?.capturePasses) return;
+        this.setState({ capturing: true });
+        try {
+            const imgs: string[] = await viewer.capturePasses(PASS_DEFS.map(p => p.mode));
+            if (this.state.passesMode && imgs && imgs.filter(Boolean).length === PASS_DEFS.length) {
+                this.setState({ passImages: imgs });
+            }
+        } catch (e) { /* leave last images / fall back to labels-only */ }
+        this.setState({ capturing: false });
+    };
 
     // ---- animation wiring ----
     get anim() {
@@ -123,24 +194,23 @@ class McsViewerOverlay extends React.Component<Props, State> {
     };
 
     // ---- passes wiring ----
+    // Enter passes mode: reset the fly-in, capture all 11 passes as images, and let _tick
+    // animate the slices in. Exit: clear. The wipe is composed in the DOM from the captured
+    // pass-images (see renderPasses + viewer.capturePasses); nothing drives debug.renderMode.
     setPasses = (on: boolean) => {
-        this.setState({ passesMode: on, expandedPass: on ? this.state.expandedPass : null });
-        // Phase A: drive the real engine pass. Off → back to the default forward render.
-        // (Our own stats readout is drawn in renderPasses — we don't flip on debug.stats,
-        //  which would show PlayCanvas's ministats and clash with it.)
-        this.props.setProperty('debug.renderMode', on ? (this.expandedMode() ?? 'default') : 'default');
+        if (on) {
+            this._flyT = 0;
+            this._expP = 0;
+            this._lastExpIdx = -1;
+            this.setState({ passesMode: true, expandedPass: null }, () => this.capture());
+        } else {
+            this.setState({ passesMode: false, expandedPass: null, passImages: [] });
+        }
     };
 
-    expandedMode = (): string | null => {
-        const p = PASS_DEFS.find(d => d.name === this.state.expandedPass);
-        return p ? p.mode : null;
-    };
-
-    pickPass = (def: { name: string, mode: string }) => {
+    pickPass = (def: { name: string }) => {
         const on = this.state.expandedPass === def.name;
         this.setState({ expandedPass: on ? null : def.name });
-        // Phase A shows one pass full-viewport; Phase B renders all slices simultaneously.
-        this.props.setProperty('debug.renderMode', on ? 'default' : def.mode);
     };
 
     toggleFullscreen = () => {
@@ -270,22 +340,70 @@ class McsViewerOverlay extends React.Component<Props, State> {
         );
     }
 
-    // passes inspection: diagonal pass-picker labels + live stats readout.
-    // Phase A renders the selected pass full-viewport; PHASE B (viewer.ts) will render all
-    // eleven simultaneously as scissored slices behind these same divider lines.
+    // passes wipe: the model rendered in all 11 material passes at once, split into slanted
+    // slices. Each slice is a captured pass-image (viewer.capturePasses) clipped to its
+    // diagonal band; the band geometry + fly-in + expand tween are ported from the prototype.
+    // Falls back to labels-only if capture is unavailable (e.g. no viewer / readback blocked).
     renderPasses() {
         if (!this.state.passesMode) return null;
         const scene = this.props.observerData.scene;
+        const imgs = this.state.passImages;
+        const haveImages = imgs.length === PASS_DEFS.length;
+
         const N = PASS_DEFS.length;
-        const cx = (i: number) => +(8 + i * (82 / (N - 1))).toFixed(2); // divider x%, matches prototype
+        const cx = (i: number) => 8 + i * (82 / (N - 1));                 // divider x%
+        const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+        const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+        // per-band staggered fly-in (easeOutCubic, 45ms stagger, 0.6s)
+        const fp = (i: number) => {
+            const c = clamp01((this._flyT - i * 0.045) / 0.6);
+            return 1 - Math.pow(1 - c, 3);
+        };
+        // track the expanded band index so the collapse tween has something to ease back from
+        const expIdx = this.state.expandedPass ? PASS_DEFS.findIndex(p => p.name === this.state.expandedPass) : -1;
+        if (expIdx >= 0) this._lastExpIdx = expIdx;
+        const li = this._lastExpIdx;
+        const e = this._expP;
+
+        // full-bleed corners for the expanded band; coords are [pct, vh]
+        const FULL = [[-100, 0], [300, 0], [300, 0], [-100, 0]];
+        const pt = (p: number, v: number) => (v ? `calc(${p.toFixed(2)}% ${v >= 0 ? '+' : '-'} ${Math.abs(v)}vh)` : `${p.toFixed(2)}%`);
+        const bandClip = (i: number) => {
+            let coords = [
+                i === 0 ? [-100, 0] : [cx(i), 10],
+                i === N - 1 ? [300, 0] : [cx(i + 1), 10],
+                i === N - 1 ? [300, 0] : [cx(i + 1), -10],
+                i === 0 ? [-100, 0] : [cx(i), -10]
+            ];
+            let shift = 130 * (1 - fp(i));                         // fly in from the right
+            if (li >= 0 && e > 0.0001) {
+                if (i === li) coords = coords.map((c, k) => [lerp(c[0], FULL[k][0], e), lerp(c[1], FULL[k][1], e)]);
+                else shift += (i < li ? -280 : 280) * e;          // neighbours slide out of the way
+            }
+            return `polygon(${pt(coords[0][0] + shift, coords[0][1])} 0, ${pt(coords[1][0] + shift, coords[1][1])} 0, ${pt(coords[2][0] + shift, coords[2][1])} 100%, ${pt(coords[3][0] + shift, coords[3][1])} 100%)`;
+        };
+        const lineData = (i: number) => {
+            let shift = 130 * (1 - fp(i));
+            if (li >= 0 && e > 0.0001) shift += (i <= li ? -280 : 280) * e;
+            return { left: `${(cx(i) + shift).toFixed(2)}%`, op: clamp01(fp(i) * 1.5) * (1 - e) };
+        };
 
         return (
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                {/* diagonal divider lines + vertical pass labels (each selects that pass) */}
+                {/* the diagonal pass slices (real rendered passes). pointer-events:none so
+                    drags fall through to the engine's orbit; labels do the click-to-expand. */}
+                {haveImages && PASS_DEFS.map((p, i) => (
+                    <div key={p.name} style={{ position: 'absolute', inset: 0, clipPath: bandClip(i), WebkitClipPath: bandClip(i), pointerEvents: 'none' }}>
+                        <img src={imgs[i]} alt={p.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
+                    </div>
+                ))}
+
+                {/* divider lines + vertical pass labels (labels select/expand a pass) */}
                 {PASS_DEFS.map((p, i) => {
+                    const ld = lineData(i);
                     const active = this.state.expandedPass === p.name;
                     return (
-                        <div key={p.name} style={{ position: 'absolute', left: `${cx(i)}%`, top: '50%', width: 1, height: '103vh', background: active ? 'rgba(214,166,75,0.5)' : 'rgba(176,194,228,0.26)', transform: 'translate(-50%,-50%) rotate(11.31deg)' }}>
+                        <div key={p.name} style={{ position: 'absolute', left: ld.left, top: '50%', width: 1, height: '103vh', background: active ? 'rgba(214,166,75,0.5)' : 'rgba(176,194,228,0.26)', transform: 'translate(-50%,-50%) rotate(11.31deg)', opacity: ld.op, pointerEvents: 'none' }}>
                             <div
                                 onClick={() => this.pickPass(p)}
                                 className="mcs-pass-label"
@@ -295,11 +413,13 @@ class McsViewerOverlay extends React.Component<Props, State> {
                     );
                 })}
 
-                {/* active-pass chip */}
-                {this.state.expandedPass &&
-                    <div style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 10, ...GLASS, border: '1px solid rgba(214,166,75,0.35)', borderRadius: 7, padding: '7px 13px' }}>
+                {/* expanded-pass chip — click it to collapse back to the full spread
+                    (the per-pass labels slide off-screen while expanded, so the chip is
+                    the collapse control; Esc also collapses) */}
+                {this.state.expandedPass && e > 0.5 &&
+                    <div onClick={() => this.setState({ expandedPass: null })} className="mcs-chip" style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 10, ...GLASS, border: '1px solid rgba(214,166,75,0.35)', borderRadius: 7, padding: '7px 13px', cursor: 'pointer', pointerEvents: 'auto' }}>
                         <span style={{ fontFamily: MONO, fontSize: 12, letterSpacing: '0.14em', color: '#e8c684' }}>{this.state.expandedPass.toUpperCase()}</span>
-                        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', color: '#8a93a8' }}>CLICK LABEL TO TOGGLE</span>
+                        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.10em', color: '#8a93a8' }}>CLICK TO SHOW ALL PASSES</span>
                     </div>}
 
                 {/* live stats readout (real scene data) */}

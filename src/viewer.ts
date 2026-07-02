@@ -187,6 +187,11 @@ class Viewer {
 
     multiframeBusy = false;
 
+    // passes-wipe capture (MCS Deck Viewer overlay)
+    capturingPasses = false;
+
+    capturePromise: Promise<string[]> | null = null;
+
     picker: Picker = null;
 
     cursorWorld = new Vec3();
@@ -1596,6 +1601,78 @@ class Viewer {
     setRenderMode(renderMode: string) {
         this.camera.camera.setShaderPass(renderMode !== 'default' ? `debug_${renderMode}` : 'forward');
         this.renderNextFrame();
+    }
+
+    // Capture the model rendered in each of the given render passes as scaled JPEG
+    // data-URLs — the source images for the MCS passes-wipe overlay (mcs-viewer-overlay.tsx).
+    // Multiframe is toggled off so each frame is a single clean pass (already tonemapped by
+    // the multiframe final blit); the canvas is grabbed in postrender before the browser
+    // clears the drawing buffer. Restores the user's render mode + multiframe when done.
+    capturePasses(modes: string[]): Promise<string[]> {
+        if (this.capturingPasses && this.capturePromise) {
+            return this.capturePromise;
+        }
+        this.capturingPasses = true;
+        this.capturePromise = (async () => {
+            const cam = this.camera.camera;
+            const prevMultiframe = this.multiframe ? this.multiframe.enabled : false;
+            if (this.multiframe) {
+                this.multiframe.enabled = false;
+            }
+            const out: string[] = [];
+            try {
+                for (const mode of modes) {
+                    cam.setShaderPass(mode === 'default' ? 'forward' : `debug_${mode}`);
+                    // sequential by design: each pass shares the one camera/canvas
+                    // eslint-disable-next-line no-await-in-loop
+                    out.push(await this.grabPassFrame());
+                }
+            } finally {
+                // restore the user's current render mode + multiframe accumulation
+                this.setRenderMode(this.observer.get('debug.renderMode') || 'default');
+                if (this.multiframe) {
+                    this.multiframe.enabled = prevMultiframe;
+                }
+                this.renderNextFrame();
+                this.capturingPasses = false;
+            }
+            return out;
+        })();
+        return this.capturePromise;
+    }
+
+    // render one frame and grab the canvas (in postrender, after the multiframe blit) as a
+    // scaled JPEG data-URL.
+    private grabPassFrame(): Promise<string> {
+        return new Promise((resolve) => {
+            let done = false;
+            const finish = (data: string) => {
+                if (done) return;
+                done = true;
+                resolve(data);
+            };
+            const grab = () => {
+                let data = '';
+                try {
+                    const src = this.canvas;
+                    const scale = Math.min(1, 1280 / src.width);
+                    const w = Math.max(1, Math.round(src.width * scale));
+                    const h = Math.max(1, Math.round(src.height * scale));
+                    const c = document.createElement('canvas');
+                    c.width = w;
+                    c.height = h;
+                    c.getContext('2d')?.drawImage(src, 0, 0, w, h);
+                    data = c.toDataURL('image/jpeg', 0.85);
+                } catch (e) {
+                    // readback can fail on some devices — return empty, overlay falls back
+                }
+                finish(data);
+            };
+            this.app.once('postrender', grab);
+            this.app.renderNextFrame = true;
+            // safety: never hang the capture if the render loop is idle
+            setTimeout(() => finish(''), 1000);
+        });
     }
 
     setLightEnabled(value: boolean) {

@@ -70,10 +70,22 @@ clean full viewport + gradient bg, everything else is minimal overlays.
     files kept on disk (not imported) for upstream merges. `style.scss` adds only `.mcs-*:hover` (overlay is inline).
   - Overlay root is `pointer-events:none` so orbit/zoom fall through to the engine's own camera-controls
     (no re-implemented camera math). Orbit-only in practice (fly UI is gone with the panels).
-- **PHASE B (next, the one real engine piece):** the simultaneous **diagonal-wipe** — render all 11
-  passes at once as scissored per-slice re-renders in `viewer.ts` (today Phase A shows one selected
-  pass full-viewport behind the diagonal pass-picker labels). Then: **card framing** (deck/rarity from
-  `deck.json`) and the **embed hook** for megacity.studio.
+- **PHASE B DONE (2026-07-02, same branch):** the simultaneous **diagonal-wipe** — all 11 passes shown
+  at once. Approach (chosen after reading the render pipeline): instead of rewriting the Multiframe/
+  tonemap pipeline, `viewer.ts` `capturePasses(modes)` renders the model in each pass with
+  `multiframe.enabled=false` (→ one clean, already-tonemapped frame) and grabs the canvas in
+  `postrender` (before the buffer clears) as a scaled JPEG — 11 data-URLs (+ a 1s timeout guard so an
+  idle render loop can't hang it). The overlay composes those into 11 `clip-path` diagonal slices using
+  the prototype's exact band geometry + fly-in/expand rAF tween; re-captures on orbit/zoom **settle**.
+  Isolated behind the passes toggle (zero impact on normal viewing); falls back to labels-only if
+  capture is unavailable. Collapse control = the expanded-pass **chip** (labels slide off while
+  expanded) + Esc (collapse-then-exit). VERIFIED headless: build clean, capture returns 11 real JPEGs,
+  slices + dividers + labels + fly-in + expand chip all compose (per-pass *colours* need a loaded model
+  on a real GPU — GLB won't upload under swiftshader).
+  - **HONEST LIMIT:** the wipe refreshes on orbit-*settle*, not live at 60fps *during* the drag (slices
+    are captured images). The live upgrade = a GPU composite (11 RT-cameras → one diagonal-band shader);
+    bigger + needs a real GPU to verify — deferred.
+- **NEXT:** **card framing** (deck/rarity/poly from `deck.json`) + the megacity.studio **embed hook**.
 
 ## ⚠️ Gotcha — id-wired controls (hard-won)
 The model-viewer wires controls **imperatively via `document.getElementById(...)`** — `panel-toggle`,
