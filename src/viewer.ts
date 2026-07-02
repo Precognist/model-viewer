@@ -73,6 +73,7 @@ import { CameraControls } from './camera-controls';
 import { DebugLines } from './debug-lines';
 import { CreateDropHandler } from './drop-handler';
 import { Multiframe } from './multiframe';
+import { PassesWipe } from './passes-wipe';
 import { Picker } from './picker';
 import { PngExporter } from './png-exporter';
 import { ShadowCatcher } from './shadow-catcher';
@@ -191,6 +192,9 @@ class Viewer {
     capturingPasses = false;
 
     capturePromise: Promise<string[]> | null = null;
+
+    // GPU passes-wipe (on-GPU compositor; replaces the capture path)
+    passesWipe: PassesWipe | null = null;
 
     picker: Picker = null;
 
@@ -1603,6 +1607,40 @@ class Viewer {
         this.renderNextFrame();
     }
 
+    // Toggle the on-GPU passes-wipe (all 11 material passes composited into diagonal slices,
+    // rendered live with no CPU readback). Returns true if it engaged, false if it fell back
+    // (WebGPU, or any setup failure) so the caller can use the snapshot path instead.
+    setPassesWipe(on: boolean): boolean {
+        try {
+            if (this.app.graphicsDevice.isWebGPU) return false;   // GLSL-only for now
+            if (on) {
+                if (!this.passesWipe) {
+                    this.passesWipe = new PassesWipe(this.app, this.camera);
+                }
+                this.passesWipe.enable(this.multiframe);
+            } else if (this.passesWipe) {
+                this.passesWipe.disable(this.multiframe);
+            }
+            this.renderNextFrame();
+            return on ? !!this.passesWipe?.enabled : false;
+        } catch (e) {
+            // never break normal viewing — tear down and fall back
+            try {
+                this.passesWipe?.disable(this.multiframe);
+            } catch (e2) { /* ignore */ }
+            console.warn('[mcs] passes-wipe failed, falling back to snapshot path', e);
+            return false;
+        }
+    }
+
+    // feed the wipe its animation state (fly-in, expand) each frame + request a render
+    setPassesAnim(flyT: number, expP: number, expandedIdx: number) {
+        if (this.passesWipe?.enabled) {
+            this.passesWipe.setAnim(flyT, expP, expandedIdx);
+            this.renderNextFrame();
+        }
+    }
+
     // Capture the model rendered in each of the given render passes as scaled JPEG
     // data-URLs — the source images for the MCS passes-wipe overlay (mcs-viewer-overlay.tsx).
     // Multiframe is toggled off so each frame is a single clean pass (already tonemapped by
@@ -2139,6 +2177,9 @@ class Viewer {
 
         // rebuild render targets
         this.rebuildRenderTargets();
+
+        // keep the passes-wipe targets sized to the viewport
+        this.passesWipe?.resize();
     }
 
     // generate and render debug elements on prerender

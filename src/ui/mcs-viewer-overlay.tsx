@@ -53,7 +53,8 @@ type Props = { observerData: ObserverData, setProperty: SetProperty };
 type State = {
     passesMode: boolean,
     expandedPass: string | null,
-    passImages: string[],   // captured per-pass images (data URLs), 11 entries when ready
+    gpuWipe: boolean,       // true → the engine composites the wipe on-GPU (live); else snapshot fallback
+    passImages: string[],   // captured per-pass images (data URLs) — snapshot fallback only
     capturing: boolean,
     help: boolean,
     menu: boolean,
@@ -82,7 +83,7 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
     constructor(props: Props) {
         super(props);
-        this.state = { passesMode: false, expandedPass: null, passImages: [], capturing: false, help: false, menu: false, fullscreen: false };
+        this.state = { passesMode: false, expandedPass: null, gpuWipe: false, passImages: [], capturing: false, help: false, menu: false, fullscreen: false };
     }
 
     componentDidMount(): void {
@@ -104,7 +105,8 @@ class McsViewerOverlay extends React.Component<Props, State> {
         this._onFs = () => this.setState({ fullscreen: !!document.fullscreenElement });
         // after orbit/zoom, re-capture the passes so the wipe reflects the new view
         this._onSettle = () => {
-            if (!this.state.passesMode) return;
+            // GPU wipe re-renders live on orbit; only the snapshot fallback needs re-capture
+            if (!this.state.passesMode || this.state.gpuWipe) return;
             clearTimeout(this._settleTimer);
             this._settleTimer = setTimeout(() => this.capture(), 220);
         };
@@ -142,7 +144,15 @@ class McsViewerOverlay extends React.Component<Props, State> {
                 active = true;
             }
         }
-        if (active) this.forceUpdate();
+        if (active) {
+            // drive the GPU compositor's fly-in/expand uniforms; forceUpdate animates the
+            // DOM dividers/labels that overlay it (both modes)
+            if (this.state.gpuWipe) {
+                const expIdx = this.state.expandedPass ? PASS_DEFS.findIndex(p => p.name === this.state.expandedPass) : -1;
+                (window as any).viewer?.setPassesAnim?.(this._flyT, this._expP, expIdx);
+            }
+            this.forceUpdate();
+        }
         this._raf = requestAnimationFrame(this._tick);
     };
 
@@ -198,13 +208,19 @@ class McsViewerOverlay extends React.Component<Props, State> {
     // animate the slices in. Exit: clear. The wipe is composed in the DOM from the captured
     // pass-images (see renderPasses + viewer.capturePasses); nothing drives debug.renderMode.
     setPasses = (on: boolean) => {
+        const viewer = (window as any).viewer;
         if (on) {
             this._flyT = 0;
             this._expP = 0;
             this._lastExpIdx = -1;
-            this.setState({ passesMode: true, expandedPass: null }, () => this.capture());
+            const gpu = !!viewer?.setPassesWipe?.(true);   // on-GPU live compositor
+            if (gpu) viewer.setPassesAnim(0, 0, -1);        // start the fly-in from 0
+            this.setState({ passesMode: true, expandedPass: null, gpuWipe: gpu }, () => {
+                if (!gpu) this.capture();                   // snapshot fallback (WebGPU / setup failure)
+            });
         } else {
-            this.setState({ passesMode: false, expandedPass: null, passImages: [] });
+            viewer?.setPassesWipe?.(false);
+            this.setState({ passesMode: false, expandedPass: null, gpuWipe: false, passImages: [] });
         }
     };
 
@@ -390,9 +406,9 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
         return (
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                {/* the diagonal pass slices (real rendered passes). pointer-events:none so
-                    drags fall through to the engine's orbit; labels do the click-to-expand. */}
-                {haveImages && PASS_DEFS.map((p, i) => (
+                {/* snapshot fallback only: DOM image slices. In GPU mode the engine composites
+                    the bands live on the canvas, so we skip these and just overlay the chrome. */}
+                {!this.state.gpuWipe && haveImages && PASS_DEFS.map((p, i) => (
                     <div key={p.name} style={{ position: 'absolute', inset: 0, clipPath: bandClip(i), WebkitClipPath: bandClip(i), pointerEvents: 'none' }}>
                         <img src={imgs[i]} alt={p.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
                     </div>
