@@ -31,5 +31,17 @@ npm run develop     # rollup watch + serve on localhost:3000
 # load an asset: http://localhost:3000/?load=<glb url>
 ```
 
+## UI direction — Marmoset Toolbag viewer (Doug)
+Target the feel of **Marmoset Toolbag's viewer**: a pro look-dev tool — **viewport-centric**, dark and
+flat, **docked side panels** (scene/hierarchy one side, properties/material/render the other) instead of
+scattered floating popups, a slim **top toolbar** for view/render/lighting, and restrained, legible
+controls. The card overlay reads as a clean Marmoset-style **info/property panel** (name / deck /
+rarity / poly·anim·material stats). Keep it premium and calm — not the busy default model-viewer chrome.
+
 ## Status
-Forked + oriented (2026-07-01). Redesign not started — this is the first CLAUDE.Design task.
+- Forked + oriented + **primed** (2026-07-01, builds clean).
+- **Tokens matched to the LIVE megacity.group/stack CSS** (dark + light: ink/panel/gold/alpha/building/
+  planned/live, --card-grad, --glow1/2, --grid, --grain, --shadow; Archivo variable + IBM Plex Mono).
+- **Next (CLAUDE.Design):** the Marmoset-style layout redesign (dock the panels + top toolbar), the
+  card framing (reuse the stack's `.card`/`.card-name`/`.card-idx`/`.card-desc` design + `--card-grad`),
+  logo/favicon swap, and deck-asset loading (`?load=`).
