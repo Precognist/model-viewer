@@ -122,11 +122,11 @@ class LeftPanel extends React.Component <{ observerData: ObserverData, setProper
     }
 
     componentDidMount(): void {
-        // set up the control panel toggle button
-        document.getElementById('panel-toggle').addEventListener('click', () => {
+        // set up the control panel toggle button (null-guarded — the #title header was removed)
+        document.getElementById('panel-toggle')?.addEventListener('click', () => {
             toggleCollapsed();
         });
-        document.getElementById('title').addEventListener('click', () => {
+        document.getElementById('title')?.addEventListener('click', () => {
             toggleCollapsed();
         });
         // we require this setTimeout because panel isn't yet created and so fails
