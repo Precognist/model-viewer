@@ -940,3 +940,50 @@ input {
 .pcui-select-input:not(.pcui-disabled):not(.pcui-readonly) .pcui-select-input-list > *:hover, .pcui-select-input:not(.pcui-disabled):not(.pcui-readonly) .pcui-select-input-list > .pcui-select-input-label-highlighted {
     background-color: $bcg-primary;
 }
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   MegaCity.Studio skin — FIRST PASS (head start). Tokens = the MegaCity design system
+   (from megacity-stack.html, via simulacrum-pc-viewer/src/App.css). Refine the exact aesthetic
+   against https://megacity.group/stack/ next. Appended last so it wins on equal specificity.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+:root {
+    --ink: #090c12; --ink-2: #0d1119; --panel: #0f141d;
+    --line: rgba(176, 194, 228, 0.12); --line-2: rgba(176, 194, 228, 0.22);
+    --text: #e7ecf6; --dim: #8a93a8;
+    --gold: #d6a64b; --gold-soft: #e8c684; --live: #4dc08c;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: "Archivo", system-ui, sans-serif;
+}
+
+body { background: var(--ink); font-family: var(--sans); }
+#panel-left { background-color: var(--panel) !important; border-right: 1px solid var(--line); }
+h3 { background-color: var(--ink-2); color: var(--text); font-family: var(--mono); letter-spacing: 0.08em; }
+.controls { background-color: var(--ink-2); }
+
+/* gold accents (was #FAD961) */
+#panel-toggle::before,
+.pcui-panel.pcui-collapsible > .pcui-panel-header:before { color: var(--gold-soft) !important; }
+#panel-toggle:hover::before { color: var(--text); }
+
+/* type → mono labels / sans body, on the MegaCity palette */
+.pcui-label, .pcui-button, .pcui-text-input { color: var(--text) !important; font-family: var(--mono) !important; }
+label, .panel-label, .header span { color: var(--dim); }
+.header div,
+#panel-left > .header > #title > div,
+#view-panel > .pcui-label,
+#load-controls > .load-button-panel > .header > div > span { color: var(--text) !important; }
+.font-thin, .font-light, .font-regular, .font-bold { font-family: var(--sans); }
+
+/* floating panels / popups → MegaCity panel glass + hairline */
+.popup-panel, .selected-node-panel, .animation-panel,
+.animation-controls-panel-parent, .load-button-panel {
+    background-color: color-mix(in srgb, var(--panel) 88%, transparent) !important;
+    border: 1px solid var(--line-2);
+}
+.popup-button { background-color: color-mix(in srgb, var(--panel) 70%, transparent) !important; color: var(--text); }
+.popup-button.selected { background-color: color-mix(in srgb, var(--gold) 24%, transparent) !important; }
+#drag-drop { background-color: color-mix(in srgb, var(--ink-2) 55%, transparent); border: 1px dashed var(--line-2); }
+.scene-hierarchy-panel, .selected-node-panel { border: 1px solid var(--line) !important; }
+
+/* primary button = gold */
+.pcui-button.secondary { background-color: var(--gold); color: var(--ink) !important; }
+.pcui-button.secondary:not(.pcui-disabled):hover { background-color: var(--gold-soft); color: var(--ink) !important; }
