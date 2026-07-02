@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;overscroll-behavior:none}
+</style>
+</helmet>
+
+<div data-screen-label="Deck Viewer" style="position:fixed;inset:0;overflow:hidden;background:#090c12;font-family:'Archivo',sans-serif;color:#e7ecf6;user-select:none;-webkit-user-select:none">
+
+  <!-- ===== backdrop ===== -->
+  <div style="position:absolute;inset:0;background:radial-gradient(140% 110% at 50% 18%, #141a27 0%, #0b0f17 52%, #05070b 100%)"></div>
+  <div style="position:absolute;inset:0;background:{{ ambientTint }}"></div>
+  <div style="position:absolute;left:50%;top:50%;width:220vmax;height:220vmax;margin:-110vmax 0 0 -110vmax;transform:{{ lightTf }};background:radial-gradient(46% 15% at 50% 22%, rgba(232,198,132,0.10), transparent 72%);pointer-events:none"></div>
+  <div style="position:absolute;left:0;right:0;bottom:0;height:34%;background:linear-gradient(to top, rgba(3,4,7,0.55), transparent);pointer-events:none"></div>
+
+  <!-- ===== 3D viewport ===== -->
+  <div ref="{{ vpRef }}" onPointerDown="{{ vpDown }}" onPointerMove="{{ vpMove }}" onPointerUp="{{ vpUp }}" onDoubleClick="{{ vpReset }}" style="position:absolute;inset:0;cursor:{{ cursor }};touch-action:none">
+
+    <!-- ground shadow (always visible) -->
+    <div style="position:absolute;left:50%;top:calc(50% + 170px);width:340px;height:64px;background:radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.6), transparent 70%);filter:blur(10px);transform:{{ shadowTf }};opacity:{{ shadowOp }};pointer-events:none"></div>
+
+    <!-- base lit cube -->
+    <sc-if value="{{ passesOff }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;perspective:1500px;pointer-events:none">
+        <div style="position:relative;width:0;height:0;transform-style:preserve-3d;transform:{{ cubeTf }}">
+          <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:translateZ(120px);background:linear-gradient(155deg,#3b4454,#2a3140);box-shadow:inset 0 0 0 1px rgba(214,166,75,0.14);backface-visibility:hidden"></div>
+          <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateY(180deg) translateZ(120px);background:#20262f;box-shadow:inset 0 0 0 1px rgba(214,166,75,0.10);backface-visibility:hidden"></div>
+          <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateY(90deg) translateZ(120px);background:linear-gradient(155deg,#252c3a,#1b2129);box-shadow:inset 0 0 0 1px rgba(214,166,75,0.12);backface-visibility:hidden"></div>
+          <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateY(-90deg) translateZ(120px);background:linear-gradient(155deg,#303848,#242b37);box-shadow:inset 0 0 0 1px rgba(214,166,75,0.12);backface-visibility:hidden"></div>
+          <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateX(90deg) translateZ(120px);background:linear-gradient(155deg,#4c5769,#39424f);box-shadow:inset 0 0 0 1px rgba(214,166,75,0.16);backface-visibility:hidden"></div>
+          <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateX(-90deg) translateZ(120px);background:#171c24;box-shadow:inset 0 0 0 1px rgba(214,166,75,0.08);backface-visibility:hidden"></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- passes wipe: one clipped band per render layer -->
+    <sc-if value="{{ passes }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0">
+
+        <sc-for list="{{ bands }}" as="b" hint-placeholder-count="10">
+          <div onClick="{{ b.click }}" style="position:absolute;inset:0;clip-path:{{ b.clip }};cursor:pointer">
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;perspective:1500px;pointer-events:none">
+              <div style="position:relative;width:0;height:0;transform-style:preserve-3d;transform:{{ cubeTf }}">
+                <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:translateZ(120px);background:{{ b.f0 }};box-shadow:{{ b.inset }};backface-visibility:hidden"></div>
+                <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateY(180deg) translateZ(120px);background:{{ b.f1 }};box-shadow:{{ b.inset }};backface-visibility:hidden"></div>
+                <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateY(90deg) translateZ(120px);background:{{ b.f2 }};box-shadow:{{ b.inset }};backface-visibility:hidden"></div>
+                <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateY(-90deg) translateZ(120px);background:{{ b.f3 }};box-shadow:{{ b.inset }};backface-visibility:hidden"></div>
+                <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateX(90deg) translateZ(120px);background:{{ b.f4 }};box-shadow:{{ b.inset }};backface-visibility:hidden"></div>
+                <div style="position:absolute;left:-120px;top:-120px;width:240px;height:240px;transform:rotateX(-90deg) translateZ(120px);background:{{ b.f5 }};box-shadow:{{ b.inset }};backface-visibility:hidden"></div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+
+        <!-- divider lines + rotated labels -->
+        <sc-for list="{{ passLines }}" as="pl" hint-placeholder-count="10">
+          <div style="position:absolute;left:{{ pl.left }};top:50%;width:1px;height:103vh;background:rgba(176,194,228,0.26);transform:translate(-50%,-50%) rotate(11.31deg);pointer-events:none;opacity:{{ pl.op }}">
+            <div style="position:absolute;bottom:145px;left:10px;writing-mode:vertical-rl;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.10em;color:rgba(231,236,246,0.78);text-shadow:0 1px 8px rgba(0,0,0,0.6)">{{ pl.label }}</div>
+          </div>
+        </sc-for>
+
+        <!-- expanded layer chip -->
+        <sc-if value="{{ expandedOn }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:rgba(15,20,29,0.85);border:1px solid rgba(214,166,75,0.35);border-radius:7px;padding:7px 13px;backdrop-filter:blur(6px);pointer-events:none">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.14em;color:#e8c684">{{ expandedName }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.10em;color:#8a93a8">CLICK TO SHOW ALL PASSES</span>
+          </div>
+        </sc-if>
+
+        <!-- stats readout -->
+        <div style="position:absolute;left:22px;top:20px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.9;letter-spacing:0.08em;color:#8a93a8;pointer-events:none">
+          <div>TRIANGLES <span style="color:#e8c684">12</span></div>
+          <div>VERTICES <span style="color:#e8c684">8</span></div>
+          <div>FACES <span style="color:#e8c684">6</span></div>
+          <div>BONES <span style="color:#e8c684">0</span></div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- ===== top-right: title + icon column ===== -->
+  <div style="position:absolute;top:18px;right:18px;display:flex;flex-direction:column;align-items:flex-end;gap:14px">
+    <div style="text-align:right">
+      <div style="font-size:15px;font-weight:600;letter-spacing:0.02em">Standard Cube</div>
+      <div style="margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.14em;color:#8a93a8">FOUNDATION DECK · <a href="https://megacity.studio" target="_blank" style="color:#d6a64b;text-decoration:none">MEGACITY.STUDIO</a></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <a href="https://megacity.studio" target="_blank" title="megacity.studio" style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:8px;cursor:pointer;backdrop-filter:blur(6px)" style-hover="border-color:rgba(214,166,75,0.55)">
+        <img src="assets/mc-mark-light.png" alt="MegaCity" style="width:24px;height:24px;display:block">
+      </a>
+      <button onClick="{{ toggleFs }}" title="Fullscreen" style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:8px;cursor:pointer;padding:0;backdrop-filter:blur(6px)" style-hover="border-color:rgba(214,166,75,0.55)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#e7ecf6" stroke-width="1.5"><path d="M1 5 V1 H5"></path><path d="M11 1 H15 V5"></path><path d="M15 11 V15 H11"></path><path d="M5 15 H1 V11"></path></svg>
+      </button>
+      <button onClick="{{ togglePasses }}" title="Material passes" style="position:relative;width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:8px;cursor:pointer;padding:0;backdrop-filter:blur(6px)" style-hover="border-color:rgba(214,166,75,0.55)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#e7ecf6" stroke-width="1.5"><path d="M6 1 L1 6"></path><path d="M11 1 L1 11"></path><path d="M15 2 L2 15"></path><path d="M15 7 L7 15"></path><path d="M15 12 L12 15"></path></svg>
+        <sc-if value="{{ passes }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:-1px;border:1px solid #d6a64b;border-radius:8px;pointer-events:none"></div>
+        </sc-if>
+      </button>
+      <button onClick="{{ openHelp }}" title="Help" style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:8px;cursor:pointer;padding:0;backdrop-filter:blur(6px);font-family:'IBM Plex Mono',monospace;font-size:15px;color:#e7ecf6" style-hover="border-color:rgba(214,166,75,0.55)">?</button>
+    </div>
+  </div>
+
+  <!-- ===== bottom animation bar ===== -->
+  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;padding:14px 18px 16px">
+    <button onClick="{{ cycleSpeed }}" title="Playback speed" style="min-width:52px;height:32px;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:6px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#e7ecf6;padding:0 10px;backdrop-filter:blur(6px)" style-hover="border-color:rgba(214,166,75,0.55)">{{ speedLabel }}</button>
+
+    <button onClick="{{ togglePlay }}" title="Play / pause" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:6px;cursor:pointer;padding:0;backdrop-filter:blur(6px)" style-hover="border-color:rgba(214,166,75,0.55)">
+      <sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:3px"><div style="width:3px;height:11px;background:#e7ecf6"></div><div style="width:3px;height:11px;background:#e7ecf6"></div></div>
+      </sc-if>
+      <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}">
+        <div style="width:0;height:0;border-left:10px solid #e7ecf6;border-top:6px solid transparent;border-bottom:6px solid transparent;margin-left:2px"></div>
+      </sc-if>
+    </button>
+
+    <div ref="{{ trackRef }}" onPointerDown="{{ trackDown }}" onPointerMove="{{ trackMove }}" onPointerUp="{{ trackUp }}" style="position:relative;flex:1;height:28px;cursor:pointer;touch-action:none">
+      <div style="position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(176,194,228,0.16)"></div>
+      <div style="position:absolute;left:0;top:50%;height:2px;margin-top:-1px;background:linear-gradient(90deg, rgba(214,166,75,0.35), #d6a64b);width:{{ pct }}"></div>
+      <div style="position:absolute;top:50%;left:{{ pct }};width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:#e8c684;box-shadow:0 0 0 3px rgba(214,166,75,0.22), 0 0 12px rgba(214,166,75,0.45)"></div>
+    </div>
+
+    <div style="position:relative">
+      <button onClick="{{ toggleMenu }}" title="Animation clip" style="height:32px;background:rgba(15,20,29,0.85);border:1px solid rgba(176,194,228,0.12);border-radius:6px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#e7ecf6;padding:0 12px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px)" style-hover="border-color:rgba(214,166,75,0.55)">
+        <span>{{ clip }}</span><span style="color:#8a93a8;font-size:9px">▲</span>
+      </button>
+      <sc-if value="{{ menu }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;right:0;bottom:40px;min-width:100%;background:#0f141d;border:1px solid rgba(176,194,228,0.12);border-radius:8px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,0.5);z-index:30">
+          <sc-for list="{{ clipsList }}" as="c" hint-placeholder-count="3">
+            <div onClick="{{ c.pick }}" style="padding:8px 12px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap;cursor:pointer;color:{{ c.color }}" style-hover="background:rgba(176,194,228,0.07)">{{ c.name }}</div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- click-away for clip menu -->
+  <sc-if value="{{ menu }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeMenu }}" style="position:absolute;inset:0;z-index:20"></div>
+  </sc-if>
+
+  <!-- ===== help modal ===== -->
+  <sc-if value="{{ help }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeHelp }}" style="position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(4,6,10,0.62);backdrop-filter:blur(4px)">
+      <div onClick="{{ swallow }}" style="position:relative;width:400px;max-width:calc(100vw - 48px);background:#0f141d;border:1px solid rgba(176,194,228,0.12);border-radius:14px;padding:30px 32px 26px;box-shadow:0 24px 80px rgba(0,0,0,0.6)">
+        <button onClick="{{ closeHelp }}" title="Close" style="position:absolute;top:12px;right:12px;width:30px;height:30px;background:transparent;border:none;cursor:pointer;color:#8a93a8;font-family:'IBM Plex Mono',monospace;font-size:14px;padding:0" style-hover="color:#e7ecf6">✕</button>
+
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.22em;color:#8a93a8;margin-bottom:18px">CONTROLS</div>
+
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:center">
+          <div style="justify-self:start;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:#e8c684;background:rgba(214,166,75,0.08);border:1px solid rgba(214,166,75,0.25);border-radius:5px;padding:5px 9px;white-space:nowrap">LEFT DRAG</div>
+          <div style="font-size:14px">Rotate</div>
+          <div style="justify-self:start;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:#e8c684;background:rgba(214,166,75,0.08);border:1px solid rgba(214,166,75,0.25);border-radius:5px;padding:5px 9px;white-space:nowrap">SCROLL</div>
+          <div style="font-size:14px">Zoom</div>
+          <div style="justify-self:start;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:#e8c684;background:rgba(214,166,75,0.08);border:1px solid rgba(214,166,75,0.25);border-radius:5px;padding:5px 9px;white-space:nowrap">DOUBLE CLICK</div>
+          <div style="font-size:14px">Reset camera</div>
+          <div style="justify-self:start;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.08em;color:#e8c684;background:rgba(214,166,75,0.08);border:1px solid rgba(214,166,75,0.25);border-radius:5px;padding:5px 9px;white-space:nowrap">SHIFT + DRAG</div>
+          <div style="font-size:14px">Rotate lights</div>
+        </div>
+
+        <div style="height:1px;background:rgba(176,194,228,0.12);margin:24px 0 20px"></div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+          <img src="assets/mc-mark-light.png" alt="MegaCity" style="width:34px;height:34px;display:block">
+          <div style="font-size:17px;font-weight:700;letter-spacing:0.30em;margin-left:0.30em">MEGACITY <span style="color:#d6a64b">VIEWER</span></div>
+          <a href="https://megacity.studio" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.14em;color:#8a93a8;text-decoration:none" style-hover="color:#e8c684">MEGACITY.STUDIO</a>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;autoplay&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Playback&quot;},&quot;ambient&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Studio Ink&quot;,&quot;Warm Dusk&quot;,&quot;Void Black&quot;],&quot;default&quot;:&quot;Studio Ink&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Scene&quot;},&quot;modelScale&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0.5,&quot;max&quot;:1.6,&quot;step&quot;:0.05,&quot;default&quot;:1,&quot;unit&quot;:&quot;×&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Scene&quot;}}">
+class Component extends DCLogic {
+  state = {
+    yaw: -28, pitch: -16, zoom: 1, lightYaw: 30,
+    playing: true, speed: 1, t: 0.18,
+    clip: 'Hover Idle',
+    passes: false, help: false, menu: false,
+    expanded: null, entered: false, entering: false,
+    dragging: false
+  };
+
+  clips = ['Hover Idle', 'Turntable', 'Pulse'];
+  speeds = [0.5, 1, 1.5, 2];
+
+  // PlayCanvas model-viewer render layers.
+  // Faces: [front, back, right, left, top, bottom]
+  passDefs = [
+    { name: 'Default', faces: ['linear-gradient(155deg,#3b4454,#2a3140)', '#20262f', 'linear-gradient(155deg,#252c3a,#1b2129)', 'linear-gradient(155deg,#303848,#242b37)', 'linear-gradient(155deg,#4c5769,#39424f)', '#171c24'], inset: 'inset 0 0 0 1px rgba(214,166,75,0.14)' },
+    { name: 'Lighting', faces: ['#b9bfcc', '#6a707d', '#7d8391', '#a9afbd', '#e8ebf2', '#4a4f5a'], inset: 'inset 0 0 0 1px rgba(9,12,18,0.25)' },
+    { name: 'Albedo', faces: ['#ccd1dc', '#ccd1dc', '#ccd1dc', '#ccd1dc', '#ccd1dc', '#ccd1dc'], inset: 'inset 0 0 0 1px rgba(9,12,18,0.25)' },
+    { name: 'Emissive', faces: ['#07090d', '#07090d', '#07090d', '#07090d', '#07090d', '#07090d'], inset: 'inset 0 0 0 1px rgba(231,236,246,0.12)' },
+    { name: 'WorldNormal', faces: ['#8080ff', '#808000', '#ff8080', '#008080', '#80ff80', '#800080'], inset: 'none' },
+    { name: 'Metalness', faces: ['#14181f', '#14181f', '#14181f', '#14181f', '#14181f', '#14181f'], inset: 'inset 0 0 0 1px rgba(231,236,246,0.12)' },
+    { name: 'Gloss', faces: ['linear-gradient(150deg,#c3c9d6,#7d8494)', 'linear-gradient(150deg,#aab1c0,#6b7280)', 'linear-gradient(150deg,#b0b7c6,#707786)', 'linear-gradient(150deg,#bac1cf,#767d8c)', 'linear-gradient(150deg,#d2d8e4,#8b92a2)', 'linear-gradient(150deg,#9aa1b0,#5f6674)'], inset: 'inset 0 0 0 1px rgba(9,12,18,0.2)' },
+    { name: 'Ao', faces: ['radial-gradient(130% 130% at 50% 50%, #f0f2f7 45%, #a9afbd 100%)', 'radial-gradient(130% 130% at 50% 50%, #f0f2f7 45%, #a9afbd 100%)', 'radial-gradient(130% 130% at 50% 50%, #f0f2f7 45%, #a9afbd 100%)', 'radial-gradient(130% 130% at 50% 50%, #f0f2f7 45%, #a9afbd 100%)', 'radial-gradient(130% 130% at 50% 50%, #f0f2f7 45%, #a9afbd 100%)', 'radial-gradient(130% 130% at 50% 50%, #f0f2f7 45%, #a9afbd 100%)'], inset: 'inset 0 0 0 1px rgba(9,12,18,0.25)' },
+    { name: 'Specularity', faces: ['#3a4149', '#3a4149', '#3a4149', '#3a4149', '#3a4149', '#3a4149'], inset: 'inset 0 0 0 1px rgba(231,236,246,0.10)' },
+    { name: 'Opacity', faces: ['#e7ecf6', '#e7ecf6', '#e7ecf6', '#e7ecf6', '#e7ecf6', '#e7ecf6'], inset: 'inset 0 0 0 1px rgba(9,12,18,0.25)' },
+    { name: 'Uv0', faces: ['linear-gradient(to right, rgba(255,0,0,0), rgba(255,0,0,1)), linear-gradient(to top, #000, #00cc00)', 'linear-gradient(to right, rgba(255,0,0,1), rgba(255,0,0,0)), linear-gradient(to top, #000, #00cc00)', 'linear-gradient(to right, rgba(255,0,0,0), rgba(255,0,0,1)), linear-gradient(to top, #000, #00cc00)', 'linear-gradient(to right, rgba(255,0,0,1), rgba(255,0,0,0)), linear-gradient(to top, #000, #00cc00)', 'linear-gradient(to right, rgba(255,0,0,0), rgba(255,0,0,1)), linear-gradient(to bottom, #000, #00cc00)', 'linear-gradient(to right, rgba(255,0,0,0), rgba(255,0,0,1)), linear-gradient(to top, #000, #00cc00)'], inset: 'none' }
+  ];
+
+  vpRef = React.createRef();
+  trackRef = React.createRef();
+
+  componentDidMount() {
+    if (this.props.autoplay === false) this.setState({ playing: false });
+    this._last = performance.now();
+    this._raf = requestAnimationFrame(this._tick);
+    this._onWheel = (e) => {
+      e.preventDefault();
+      const z = Math.min(2.6, Math.max(0.45, this.state.zoom * Math.exp(-e.deltaY * 0.0011)));
+      this.setState({ zoom: z });
+    };
+    if (this.vpRef.current) this.vpRef.current.addEventListener('wheel', this._onWheel, { passive: false });
+    this._onKey = (e) => {
+      if (e.key === 'Escape') this.setState({ help: false, menu: false, expanded: null });
+      if (e.key === ' ' && !this.state.help) { e.preventDefault(); this.setState(s => ({ playing: !s.playing })); }
+    };
+    window.addEventListener('keydown', this._onKey);
+  }
+
+  componentWillUnmount() {
+    cancelAnimationFrame(this._raf);
+    if (this.vpRef.current) this.vpRef.current.removeEventListener('wheel', this._onWheel);
+    window.removeEventListener('keydown', this._onKey);
+  }
+
+  _flyT = 99;   // seconds since passes opened (staggered fly-in)
+  _expP = 0;    // eased 0..1 expansion progress
+
+  _tick = (now) => {
+    const dt = Math.min(0.05, (now - this._last) / 1000);
+    this._last = now;
+
+    // passes animations (JS-driven; CSS transitions get clobbered by per-frame renders)
+    let animActive = false;
+    if (this.state.passes) {
+      if (this._flyT < 1.4) { this._flyT += dt; animActive = true; }
+      const target = this.state.expanded ? 1 : 0;
+      if (this._expP !== target) {
+        this._expP += (target - this._expP) * Math.min(1, dt * 9);
+        if (Math.abs(target - this._expP) < 0.003) this._expP = target;
+        animActive = true;
+      }
+    }
+
+    if (this.state.playing && !this._scrub) {
+      this.setState(s => ({ t: (s.t + dt * s.speed / 5) % 1 }));
+    } else if (animActive) {
+      this.forceUpdate();
+    }
+    this._raf = requestAnimationFrame(this._tick);
+  };
+
+  _seek(clientX) {
+    const el = this.trackRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const t = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    this.setState({ t });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const TAU = Math.PI * 2;
+    let bob = 0, tilt = 0, clipYaw = 0, pulse = 1;
+    if (s.clip === 'Hover Idle') { bob = Math.sin(s.t * TAU) * 24; tilt = Math.sin(s.t * TAU * 2) * 2; }
+    else if (s.clip === 'Turntable') { clipYaw = s.t * 360; }
+    else if (s.clip === 'Pulse') { pulse = 1 + 0.055 * Math.sin(s.t * TAU * 2); }
+
+    const scale = s.zoom * (this.props.modelScale ?? 1) * pulse;
+    const cubeTf = 'translate3d(0,' + (-bob).toFixed(1) + 'px,0) scale3d(' + scale.toFixed(3) + ',' + scale.toFixed(3) + ',' + scale.toFixed(3) + ') rotateX(' + (s.pitch + tilt).toFixed(1) + 'deg) rotateY(' + (s.yaw + clipYaw).toFixed(1) + 'deg)';
+    const shScale = scale * (1 - (bob + 24) / 48 * 0.18);
+    const shadowTf = 'translateX(-50%) scale(' + shScale.toFixed(3) + ')';
+    const shadowOp = (0.6 - (bob + 24) / 48 * 0.28).toFixed(2);
+
+    const ambient = this.props.ambient ?? 'Studio Ink';
+    const tints = {
+      'Studio Ink': 'radial-gradient(120% 90% at 50% 28%, rgba(96,118,160,0.14), transparent 62%)',
+      'Warm Dusk': 'radial-gradient(120% 90% at 50% 30%, rgba(214,166,75,0.13), transparent 62%)',
+      'Void Black': 'radial-gradient(120% 100% at 50% 50%, rgba(0,0,0,0.35), rgba(0,0,0,0.55))'
+    };
+
+    // band geometry: N slanted slices; slant ±10vh; lines span 2%..84%
+    const N = this.passDefs.length;
+    const cx = (i) => +((8 + i * (82 / (N - 1))).toFixed(2));
+    const expandedIdx = s.expanded ? this.passDefs.findIndex(p => p.name === s.expanded) : -1;
+    const expandedDef = expandedIdx >= 0 ? this.passDefs[expandedIdx] : null;
+    if (expandedIdx >= 0) this._lastExpIdx = expandedIdx;
+    const li = this._lastExpIdx ?? -1;             // last expanded index (kept during collapse anim)
+    const e = this._expP;                           // eased expansion progress 0..1
+
+    // per-band staggered fly-in progress (easeOutCubic)
+    const fp = (i) => {
+      const c = Math.max(0, Math.min(1, (this._flyT - i * 0.045) / 0.6));
+      return 1 - Math.pow(1 - c, 3);
+    };
+    const lerp = (a, b, k) => a + (b - a) * k;
+
+    // coords as [pct, vh]; full-bleed corners for the expanded band
+    const FULL = [[-100, 0], [300, 0], [300, 0], [-100, 0]];
+    const bandClip = (i) => {
+      let coords = [
+        i === 0 ? [-100, 0] : [cx(i), 10],
+        i === N - 1 ? [300, 0] : [cx(i + 1), 10],
+        i === N - 1 ? [300, 0] : [cx(i + 1), -10],
+        i === 0 ? [-100, 0] : [cx(i), -10]
+      ];
+      let shift = 130 * (1 - fp(i));                 // fly in from the right
+      if (li >= 0 && e > 0.0001) {
+        if (i === li) {
+          coords = coords.map((c, k) => [lerp(c[0], FULL[k][0], e), lerp(c[1], FULL[k][1], e)]);
+        } else {
+          shift += (i < li ? -280 : 280) * e;        // neighbours fly out of the way
+        }
+      }
+      const pt = (c) => {
+        const p = +(c[0] + shift).toFixed(2), v = +c[1].toFixed(2);
+        return v ? 'calc(' + p + '% ' + (v >= 0 ? '+' : '-') + ' ' + Math.abs(v) + 'vh)' : p + '%';
+      };
+      return 'polygon(' + pt(coords[0]) + ' 0, ' + pt(coords[1]) + ' 0, ' + pt(coords[2]) + ' 100%, ' + pt(coords[3]) + ' 100%)';
+    };
+
+    const bands = this.passDefs.map((p, i) => ({
+      clip: bandClip(i),
+      f0: p.faces[0], f1: p.faces[1], f2: p.faces[2], f3: p.faces[3], f4: p.faces[4], f5: p.faces[5],
+      inset: p.inset,
+      click: () => {
+        if (this._dragDist > 6) return;
+        this.setState(st => ({ expanded: st.expanded ? null : p.name }));
+      }
+    }));
+
+    const passLines = this.passDefs.map((p, i) => {
+      let shift = 130 * (1 - fp(i));                 // ride in with the band
+      if (li >= 0 && e > 0.0001) shift += (i <= li ? -280 : 280) * e;
+      return {
+        label: p.name,
+        left: +(cx(i) + shift).toFixed(2) + '%',
+        op: +(Math.min(1, fp(i) * 1.5) * (1 - e)).toFixed(3)
+      };
+    });
+
+    return {
+      vpRef: this.vpRef,
+      trackRef: this.trackRef,
+      cubeTf, shadowTf, shadowOp,
+      lightTf: 'rotate(' + s.lightYaw.toFixed(1) + 'deg)',
+      ambientTint: tints[ambient] || tints['Studio Ink'],
+      cursor: s.dragging ? 'grabbing' : 'grab',
+      passes: s.passes, passesOff: !s.passes,
+      help: s.help, menu: s.menu,
+      playing: s.playing, paused: !s.playing,
+      speedLabel: s.speed.toFixed(1) + '\u00d7',
+      pct: (s.t * 100).toFixed(2) + '%',
+      clip: s.clip,
+      bands, passLines,
+      expandedOn: !!expandedDef,
+      expandedName: expandedDef ? expandedDef.name.toUpperCase() : '',
+      clipsList: this.clips.map(name => ({
+        name,
+        color: name === s.clip ? '#e8c684' : '#e7ecf6',
+        pick: () => this.setState({ clip: name, menu: false, t: 0 })
+      })),
+
+      vpDown: (e) => {
+        if (e.button !== 0) return;
+        // capture is deferred until real movement, so clicks still reach pass slices
+        this._vpEl = e.currentTarget;
+        this._drag = { id: e.pointerId, x: e.clientX, y: e.clientY, mode: e.shiftKey ? 'light' : 'orbit', captured: false };
+        this._dragDist = 0;
+        this.setState({ dragging: true });
+      },
+      vpMove: (e) => {
+        if (!this._drag) return;
+        const dx = e.clientX - this._drag.x, dy = e.clientY - this._drag.y;
+        this._drag.x = e.clientX; this._drag.y = e.clientY;
+        this._dragDist += Math.abs(dx) + Math.abs(dy);
+        if (!this._drag.captured && this._dragDist > 4 && this._vpEl) {
+          try { this._vpEl.setPointerCapture(this._drag.id); } catch (err) {}
+          this._drag.captured = true;
+        }
+        if (this._drag.mode === 'light') {
+          this.setState(st => ({ lightYaw: st.lightYaw + dx * 0.5 }));
+        } else {
+          this.setState(st => ({
+            yaw: st.yaw + dx * 0.4,
+            pitch: Math.min(80, Math.max(-80, st.pitch - dy * 0.3))
+          }));
+        }
+      },
+      vpUp: () => { this._drag = null; this.setState({ dragging: false }); },
+      vpReset: () => this.setState({ yaw: -28, pitch: -16, zoom: 1, lightYaw: 30 }),
+
+      trackDown: (e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        this._scrub = true;
+        this._seek(e.clientX);
+      },
+      trackMove: (e) => { if (this._scrub) this._seek(e.clientX); },
+      trackUp: () => { this._scrub = false; },
+
+      togglePlay: () => this.setState(st => ({ playing: !st.playing })),
+      cycleSpeed: () => this.setState(st => ({ speed: this.speeds[(this.speeds.indexOf(st.speed) + 1) % this.speeds.length] })),
+      togglePasses: () => {
+        if (this.state.passes) {
+          this.setState({ passes: false, expanded: null });
+        } else {
+          this._flyT = 0;
+          this._expP = 0;
+          this._lastExpIdx = -1;
+          this.setState({ passes: true, expanded: null });
+        }
+      },
+      openHelp: () => this.setState({ help: true }),
+      closeHelp: () => this.setState({ help: false }),
+      toggleMenu: () => this.setState(st => ({ menu: !st.menu })),
+      closeMenu: () => this.setState({ menu: false }),
+      swallow: (e) => e.stopPropagation(),
+      toggleFs: () => {
+        try {
+          if (document.fullscreenElement) document.exitFullscreen();
+          else document.documentElement.requestFullscreen();
+        } catch (err) { /* embed may block fullscreen */ }
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
