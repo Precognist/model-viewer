@@ -56,6 +56,16 @@ clean full viewport + gradient bg, everything else is minimal overlays.
 - Forked + **primed** + **tokens matched to the live megacity.group/stack CSS** (dark+light).
 - **DONE (2026-07-02):** logo → `static/mcs-logo.png` (the light mark); **header removed**; the
   toolbar+docks rough-in was dropped (wrong Marmoset — it's the Viewer, not the app).
-- **NEXT (CLAUDE.Design polish):** build the top-right button column (logo→web / fullscreen / passes /
-  help), the passes render mode, the branded help modal, the bottom anim bar + dropdown, orbit-only
-  camera, strip the left panel, and the card framing. Skin/tokens/logo are in place.
+- **NEXT (design polish, via claude.ai/design):** build the top-right button column (logo→web /
+  fullscreen / passes / help), the passes render mode, the branded help modal, the bottom anim bar +
+  dropdown, orbit-only camera, strip the left panel, and the card framing. Skin/tokens/logo are in place.
+
+## ⚠️ Gotcha — id-wired controls (hard-won)
+The model-viewer wires controls **imperatively via `document.getElementById(...)`** — `panel-toggle`,
+`title`, `glb-url-input`, `popup`, `panel-left`, `ar-link`, `share-qr`, `spinner`, `application-canvas`, …
+**Removing an element without removing/guarding its listener throws.** Concretely: an unguarded
+`getElementById('x').addEventListener(...)` on a removed `x` throws in `componentDidMount` → the whole
+React mount fails → `#application-canvas` never renders → `createGraphicsDevice(null)` crashes the viewer
+with a blank screen. (This exact chain bit the header removal; fixed by optional-chaining, commit 1310d54.)
+**When stripping the left panel / header or building the button column: for every element you remove,
+remove or `?.`-guard its `getElementById(...)` listener** (search `src/ui/**` for `getElementById`).
