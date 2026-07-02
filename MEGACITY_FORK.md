@@ -56,9 +56,24 @@ clean full viewport + gradient bg, everything else is minimal overlays.
 - Forked + **primed** + **tokens matched to the live megacity.group/stack CSS** (dark+light).
 - **DONE (2026-07-02):** logo → `static/mcs-logo.png` (the light mark); **header removed**; the
   toolbar+docks rough-in was dropped (wrong Marmoset — it's the Viewer, not the app).
-- **NEXT (design polish, via claude.ai/design):** build the top-right button column (logo→web /
-  fullscreen / passes / help), the passes render mode, the branded help modal, the bottom anim bar +
-  dropdown, orbit-only camera, strip the left panel, and the card framing. Skin/tokens/logo are in place.
+- **PHASE A DONE (2026-07-02, branch `feat/deck-viewer-overlay`):** the Claude Design handoff
+  (`design/HANDOFF.md` + `design/deck-viewer.dc.html`) is IMPLEMENTED as **`src/ui/mcs-viewer-overlay.tsx`** —
+  a single overlay component (faithful inline-style port of the prototype) wired to the real observer:
+  - top-right **title block + icon column** (logo→megacity.studio / fullscreen / passes / help);
+  - full-width **bottom animation bar** — speed cycle (0.5/1/1.5/2×), play·pause, scrub track
+    (drag-seek, pauses playback), upward clip menu — all wired to `animation.{playing,speed,progress,selectedTrack,list}`;
+  - branded **help modal** (rotate/zoom/reset/rotate-lights legend + MEGACITY VIEWER wordmark);
+  - **passes** inspection wired to the engine's real `debug.renderMode` (11 passes) + a live stats
+    readout (triangles/verts/meshes/materials from `scene.*`) + the diagonal pass-picker labels.
+  - `src/ui/index.tsx` stripped to canvas + overlay (dropped `#panel-left`/tree/LoadControls/SelectedNode/PopupPanel;
+    kept `#app`/`#canvas-wrapper`/`#application-canvas`/`#spinner` — the ids the engine wires). Old panel
+    files kept on disk (not imported) for upstream merges. `style.scss` adds only `.mcs-*:hover` (overlay is inline).
+  - Overlay root is `pointer-events:none` so orbit/zoom fall through to the engine's own camera-controls
+    (no re-implemented camera math). Orbit-only in practice (fly UI is gone with the panels).
+- **PHASE B (next, the one real engine piece):** the simultaneous **diagonal-wipe** — render all 11
+  passes at once as scissored per-slice re-renders in `viewer.ts` (today Phase A shows one selected
+  pass full-viewport behind the diagonal pass-picker labels). Then: **card framing** (deck/rarity from
+  `deck.json`) and the **embed hook** for megacity.studio.
 
 ## ⚠️ Gotcha — id-wired controls (hard-won)
 The model-viewer wires controls **imperatively via `document.getElementById(...)`** — `panel-toggle`,

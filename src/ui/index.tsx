@@ -1,15 +1,12 @@
 import { Observer } from '@playcanvas/observer';
-import { Container, Spinner } from '@playcanvas/pcui/react';
+import { Spinner } from '@playcanvas/pcui/react';
 import React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
 import { ObserverData } from '../types';
 import { ErrorBox, WarningsBox } from './errors';
-import LeftPanel from './left-panel';
-import LoadControls from './load-controls';
-import PopupPanel from './popup-panel';
-import SelectedNode from './selected-node';
+import McsViewerOverlay from './mcs-viewer-overlay';
 
 class App extends React.Component<{ observer: Observer }> {
     state: ObserverData = null;
@@ -36,24 +33,17 @@ class App extends React.Component<{ observer: Observer }> {
         return state;
     };
 
-    _setStateProperty = (path: string, value: string) => {
+    _setStateProperty = (path: string, value: any) => {
         this.props.observer.set(path, value);
     };
 
     render() {
-        const xrActive = this.state?.runtime?.xrActive;
+        // Minimal Marmoset-style embed: no left panel / scene tree / load controls / popup.
+        // Just the canvas + the MCS overlay HUD (icon column, anim bar, passes, help modal).
         return <div id="application-container">
-            <Container id="panel-left" flex resizable='right' resizeMin={220} resizeMax={800} hidden={xrActive}>
-                <div id="panel-toggle">
-                    <img src={'static/mcs-logo.png'}/>
-                </div>
-                <LeftPanel observerData={this.state} setProperty={this._setStateProperty} />
-            </Container>
             <div id='canvas-wrapper'>
                 <canvas id="application-canvas" ref={this.canvasRef} />
-                <LoadControls setProperty={this._setStateProperty}/>
-                <SelectedNode sceneData={this.state.scene} />
-                <PopupPanel observerData={this.state} setProperty={this._setStateProperty} />
+                <McsViewerOverlay observerData={this.state} setProperty={this._setStateProperty} />
                 <ErrorBox observerData={this.state} setProperty={this._setStateProperty} />
                 <WarningsBox observerData={this.state} setProperty={this._setStateProperty} />
                 <Spinner id="spinner" size={30} hidden={true} />
