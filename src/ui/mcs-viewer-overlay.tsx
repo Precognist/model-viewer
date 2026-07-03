@@ -68,6 +68,16 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
     _onSettle: (e: Event) => void;   // orbit/zoom settle → re-capture passes
 
+    _onBandDown: (e: PointerEvent) => void;   // click-vs-drag start for slot-click expand
+
+    _onBandUp: (e: PointerEvent) => void;
+
+    _downX = 0;
+
+    _downY = 0;
+
+    _downOnUi = false;
+
     // passes-wipe animation state (ported from the Claude Design prototype)
     _raf = 0;
 
@@ -110,10 +120,31 @@ class McsViewerOverlay extends React.Component<Props, State> {
             clearTimeout(this._settleTimer);
             this._settleTimer = setTimeout(() => this.capture(), 220);
         };
+        // slot-click to expand: record where a press starts, and whether it was on a control.
+        // On release, if it barely moved (a click, not an orbit drag) and passes mode is on,
+        // expand the band under the cursor — matching the demo's click-the-slice behaviour.
+        this._onBandDown = (e: PointerEvent) => {
+            this._downX = e.clientX;
+            this._downY = e.clientY;
+            // band clicks land on the canvas (overlay non-controls are pointer-events:none);
+            // any overlay control (buttons, scrub track, chip, menu) is its own target → ignore.
+            this._downOnUi = (e.target as HTMLElement)?.id !== 'application-canvas';
+        };
+        this._onBandUp = (e: PointerEvent) => {
+            if (!this.state.passesMode || this._downOnUi) return;
+            if (Math.abs(e.clientX - this._downX) + Math.abs(e.clientY - this._downY) > 6) return; // was a drag
+            if (this.state.expandedPass) {
+                this.setState({ expandedPass: null }); return;
+            }  // any click collapses
+            const idx = this.bandAt(e.clientX, e.clientY);
+            if (idx >= 0) this.setState({ expandedPass: PASS_DEFS[idx].name });
+        };
         window.addEventListener('keydown', this._onKey);
         document.addEventListener('fullscreenchange', this._onFs);
         window.addEventListener('pointerup', this._onSettle);
         window.addEventListener('wheel', this._onSettle, { passive: true });
+        window.addEventListener('pointerdown', this._onBandDown);
+        window.addEventListener('pointerup', this._onBandUp);
         this._lastT = performance.now();
         this._raf = requestAnimationFrame(this._tick);
     }
@@ -123,8 +154,27 @@ class McsViewerOverlay extends React.Component<Props, State> {
         document.removeEventListener('fullscreenchange', this._onFs);
         window.removeEventListener('pointerup', this._onSettle);
         window.removeEventListener('wheel', this._onSettle);
+        window.removeEventListener('pointerdown', this._onBandDown);
+        window.removeEventListener('pointerup', this._onBandUp);
         cancelAnimationFrame(this._raf);
         clearTimeout(this._settleTimer);
+    }
+
+    // which band (0..N-1) a screen point falls into, accounting for the ±10vh diagonal slant
+    // (adopted from the Claude Design reference's slice hit-test).
+    bandAt(clientX: number, clientY: number): number {
+        const W = window.innerWidth;
+        const H = Math.max(1, window.innerHeight);
+        const N = PASS_DEFS.length;
+        const slant = 0.10 * H;                    // ±10vh
+        const y = clientY / H;                      // 0 top → 1 bottom
+        const lineX = (i: number) => (8 + i * (82 / (N - 1))) / 100 * W;
+        for (let i = 0; i < N; i++) {
+            const left = (i === 0 ? -W : lineX(i)) + (i === 0 ? 0 : slant) * (1 - 2 * y);
+            const right = (i === N - 1 ? 2 * W : lineX(i + 1)) + (i === N - 1 ? 0 : slant) * (1 - 2 * y);
+            if (clientX >= left && clientX < right) return i;
+        }
+        return -1;
     }
 
     // drive the fly-in + expand/collapse tweens (JS, not CSS — matches the prototype)
@@ -298,8 +348,9 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
     // bottom animation bar (hidden when the asset has no clips)
     renderAnimBar() {
+        // always shown (matches the demo). For a model with no animation the controls are
+        // present but inert; the clip button shows a placeholder.
         const clips = this.animList;
-        if (clips.length === 0) return null;
         const anim = this.anim;
         const pct = `${(Math.max(0, Math.min(1, anim.progress)) * 100).toFixed(2)}%`;
         const barBtn: React.CSSProperties = {
@@ -340,7 +391,7 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
                 <div style={{ position: 'relative', pointerEvents: 'auto' }}>
                     <button onClick={() => this.setState(s => ({ menu: !s.menu }))} title="Animation clip" className="mcs-bar-btn" style={{ ...barBtn, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>{anim.selectedTrack || clips[0]}</span><span style={{ color: '#8a93a8', fontSize: 9 }}>▲</span>
+                        <span>{anim.selectedTrack || clips[0] || '—'}</span><span style={{ color: '#8a93a8', fontSize: 9 }}>▲</span>
                     </button>
                     {this.state.menu &&
                         <>
@@ -414,16 +465,17 @@ class McsViewerOverlay extends React.Component<Props, State> {
                     </div>
                 ))}
 
-                {/* divider lines + vertical pass labels (labels select/expand a pass) */}
+                {/* divider lines + vertical pass labels. Labels are purely visual now
+                    (pointer-events:none) — expanding is done by clicking the band/slot itself,
+                    handled by the window band-click; that matches the demo. */}
                 {PASS_DEFS.map((p, i) => {
                     const ld = lineData(i);
                     const active = this.state.expandedPass === p.name;
                     return (
                         <div key={p.name} style={{ position: 'absolute', left: ld.left, top: '50%', width: 1, height: '103vh', background: active ? 'rgba(214,166,75,0.5)' : 'rgba(176,194,228,0.26)', transform: 'translate(-50%,-50%) rotate(11.31deg)', opacity: ld.op, pointerEvents: 'none' }}>
                             <div
-                                onClick={() => this.pickPass(p)}
                                 className="mcs-pass-label"
-                                style={{ position: 'absolute', bottom: 145, left: 10, writingMode: 'vertical-rl', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 12, letterSpacing: '0.10em', color: active ? '#e8c684' : 'rgba(231,236,246,0.78)', textShadow: '0 1px 8px rgba(0,0,0,0.6)', cursor: 'pointer', pointerEvents: 'auto' }}
+                                style={{ position: 'absolute', bottom: 145, left: 10, writingMode: 'vertical-rl', whiteSpace: 'nowrap', fontFamily: MONO, fontSize: 12, letterSpacing: '0.10em', color: active ? '#e8c684' : 'rgba(231,236,246,0.78)', textShadow: '0 1px 8px rgba(0,0,0,0.6)', pointerEvents: 'none' }}
                             >{p.name}</div>
                         </div>
                     );
@@ -440,16 +492,17 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
                 {/* live stats readout (real scene data) */}
                 <div style={{ position: 'absolute', left: 22, top: 20, fontFamily: MONO, fontSize: 12, lineHeight: 1.9, letterSpacing: '0.08em', color: '#8a93a8', pointerEvents: 'none' }}>
-                    <div>TRIANGLES <span style={{ color: '#e8c684' }}>{scene.primitiveCount ?? 0}</span></div>
-                    <div>VERTICES <span style={{ color: '#e8c684' }}>{scene.vertexCount ?? 0}</span></div>
-                    <div>MESHES <span style={{ color: '#e8c684' }}>{scene.meshCount ?? 0}</span></div>
-                    <div>MATERIALS <span style={{ color: '#e8c684' }}>{scene.materialCount ?? 0}</span></div>
+                    <div>TRIANGLES <span style={{ color: '#e8c684' }}>{(scene.primitiveCount ?? 0).toLocaleString()}</span></div>
+                    <div>VERTICES <span style={{ color: '#e8c684' }}>{(scene.vertexCount ?? 0).toLocaleString()}</span></div>
+                    <div>FACES <span style={{ color: '#e8c684' }}>{(scene.primitiveCount ?? 0).toLocaleString()}</span></div>
+                    <div>BONES <span style={{ color: '#e8c684' }}>{this.animList.length > 0 ? '—' : 0}</span></div>
                 </div>
             </div>
         );
     }
 
-    // branded help modal
+    // branded help modal + render options (controls legend, then environment/exposure/
+    // tonemapping + wireframe/grid/bounds toggles — all wired to the existing observer keys).
     renderHelp() {
         if (!this.state.help) return null;
         const chip: React.CSSProperties = {
@@ -465,27 +518,77 @@ class McsViewerOverlay extends React.Component<Props, State> {
             whiteSpace: 'nowrap'
         };
         const row = (key: string, label: string) => (
-            <>
-                <div style={chip}>{key}</div>
-                <div style={{ fontSize: 14 }}>{label}</div>
-            </>
+            <><div style={chip}>{key}</div><div style={{ fontSize: 14 }}>{label}</div></>
         );
+        const eyebrow: React.CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: '0.22em', color: '#8a93a8' };
+        const divider = <div style={{ height: 1, background: 'rgba(176,194,228,0.12)', margin: '22px 0 18px' }} />;
+
+        // ---- render-option controls (wired to the observer) ----
+        const { skybox, camera, debug } = this.props.observerData;
+        const set = this.props.setProperty;
+        let envOptions: Array<{ v: string, t: string }> = [];
+        try {
+            envOptions = JSON.parse(skybox.options || '[]');
+        } catch (e) { /* */ }
+        const tmOptions = ['None', 'Linear', 'Neutral', 'Filmic', 'Hejl', 'ACES', 'ACES2'].map(v => ({ v, t: v }));
+        const ctrl: React.CSSProperties = {
+            fontFamily: MONO,
+            fontSize: 12,
+            background: 'rgba(15,20,29,0.9)',
+            border: '1px solid rgba(176,194,228,0.12)',
+            borderRadius: 6,
+            padding: '5px 8px',
+            outline: 'none',
+            width: '100%'
+        };
+        const sel = (value: string, options: Array<{ v: string, t: string }>, onChange: (v: string) => void, disabled?: boolean) => (
+            <select value={value} disabled={disabled} onChange={e => onChange(e.target.value)}
+                style={{ ...ctrl, cursor: disabled ? 'default' : 'pointer', color: disabled ? '#5a6274' : '#e7ecf6' }}>
+                {options.map(o => <option key={o.v} value={o.v} style={{ background: '#0f141d', color: '#e7ecf6' }}>{o.t}</option>)}
+            </select>
+        );
+        const slider = (value: number, min: number, max: number, step: number, onChange: (v: number) => void, disabled?: boolean) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input className="mcs-range" type="range" min={min} max={max} step={step} value={value} disabled={disabled}
+                    onChange={e => onChange(parseFloat(e.target.value))} style={{ flex: 1, opacity: disabled ? 0.4 : 1 }} />
+                <span style={{ fontFamily: MONO, fontSize: 11, color: '#e8c684', minWidth: 30, textAlign: 'right' }}>{Number(value).toFixed(1)}</span>
+            </div>
+        );
+        const toggle = (on: boolean, onChange: (v: boolean) => void) => (
+            <button onClick={() => onChange(!on)} style={{ width: 38, height: 20, borderRadius: 10, padding: 2, cursor: 'pointer', justifySelf: 'start', background: on ? 'rgba(214,166,75,0.35)' : 'rgba(176,194,228,0.12)', border: `1px solid ${on ? 'rgba(214,166,75,0.55)' : 'rgba(176,194,228,0.16)'}`, display: 'flex', justifyContent: on ? 'flex-end' : 'flex-start', alignItems: 'center' }}>
+                <span style={{ width: 14, height: 14, borderRadius: '50%', background: on ? '#e8c684' : '#8a93a8', display: 'block' }} />
+            </button>
+        );
+        const optLabel: React.CSSProperties = { fontSize: 13, color: '#e7ecf6' };
+
         return (
             <div onClick={() => this.setState({ help: false })} style={{ position: 'absolute', inset: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,6,10,0.62)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', pointerEvents: 'auto' }}>
-                <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: 400, maxWidth: 'calc(100vw - 48px)', background: '#0f141d', border: '1px solid rgba(176,194,228,0.12)', borderRadius: 14, padding: '30px 32px 26px', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+                <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: 400, maxWidth: 'calc(100vw - 48px)', maxHeight: 'calc(100vh - 56px)', overflowY: 'auto', background: '#0f141d', border: '1px solid rgba(176,194,228,0.12)', borderRadius: 14, padding: '30px 32px 26px', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
                     <button onClick={() => this.setState({ help: false })} title="Close" className="mcs-close" style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, background: 'transparent', border: 'none', cursor: 'pointer', color: '#8a93a8', fontFamily: MONO, fontSize: 14, padding: 0 }}>✕</button>
 
-                    <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.22em', color: '#8a93a8', marginBottom: 18 }}>CONTROLS</div>
-
+                    <div style={{ ...eyebrow, marginBottom: 18 }}>CONTROLS</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '10px 16px', alignItems: 'center' }}>
                         {row('LEFT DRAG', 'Rotate')}
                         {row('SCROLL', 'Zoom')}
                         {row('DOUBLE CLICK', 'Reset camera')}
                         {row('SHIFT + DRAG', 'Rotate lights')}
+                        {row('SPACE', 'Play / pause')}
+                        {row('ESC', 'Close / show all')}
+                        {row('CLICK PASS', 'Expand pass')}
                     </div>
 
-                    <div style={{ height: 1, background: 'rgba(176,194,228,0.12)', margin: '24px 0 20px' }} />
+                    {divider}
+                    <div style={{ ...eyebrow, marginBottom: 16 }}>RENDER</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '13px 16px', alignItems: 'center' }}>
+                        <div style={optLabel}>Environment</div>{sel(skybox.value, envOptions, v => set('skybox.value', v))}
+                        <div style={optLabel}>Exposure</div>{slider(skybox.exposure ?? 0, -6, 6, 0.1, v => set('skybox.exposure', v), skybox.value === 'None')}
+                        <div style={optLabel}>Tonemapping</div>{sel(camera.tonemapping, tmOptions, v => set('camera.tonemapping', v))}
+                        <div style={optLabel}>Wireframe</div>{toggle(!!debug.wireframe, v => set('debug.wireframe', v))}
+                        <div style={optLabel}>Grid</div>{toggle(!!debug.grid, v => set('debug.grid', v))}
+                        <div style={optLabel}>Bounds</div>{toggle(!!debug.bounds, v => set('debug.bounds', v))}
+                    </div>
 
+                    {divider}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                         <img src="static/mcs-logo.png" alt="MegaCity" style={{ width: 34, height: 34, display: 'block' }} />
                         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '0.30em', marginLeft: '0.30em' }}>MEGACITY <span style={{ color: '#d6a64b' }}>VIEWER</span></div>

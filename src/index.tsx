@@ -77,8 +77,10 @@ const observerData: ObserverData = {
         options: JSON.stringify(['None'].concat(skyboxes.map(s => s.label)).map(l => ({ v: l, t: l }))),
         exposure: 0,
         rotation: 0,
-        background: 'Infinite Sphere',
-        backgroundColor: { r: 0.4, g: 0.45, b: 0.5 },
+        // MCS: solid-color background → canvas renders transparent, so the dark demo
+        // gradient on #canvas-wrapper (style.scss) shows through. HDR is kept for lighting.
+        background: 'Solid Color',
+        backgroundColor: { r: 0.035, g: 0.047, b: 0.071 },   // ink #090c12 fallback
         blur: 1,
         domeProjection: {
             domeRadius: 20,
