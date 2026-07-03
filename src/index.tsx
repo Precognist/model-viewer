@@ -106,7 +106,7 @@ const observerData: ObserverData = {
         bounds: false,
         skeleton: false,
         axes: false,
-        grid: true,
+        grid: false,
         normals: 0
     },
     animation: {
