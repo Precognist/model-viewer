@@ -562,7 +562,7 @@ class McsViewerOverlay extends React.Component<Props, State> {
         const optLabel: React.CSSProperties = { fontSize: 13, color: '#e7ecf6' };
 
         return (
-            <div onClick={() => this.setState({ help: false })} style={{ position: 'absolute', inset: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,6,10,0.62)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', pointerEvents: 'auto' }}>
+            <div onClick={() => this.setState({ help: false })} style={{ position: 'absolute', inset: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 24, background: 'rgba(4,6,10,0.18)', pointerEvents: 'auto' }}>
                 <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: 400, maxWidth: 'calc(100vw - 48px)', maxHeight: 'calc(100vh - 56px)', overflowY: 'auto', background: '#0f141d', border: '1px solid rgba(176,194,228,0.12)', borderRadius: 14, padding: '30px 32px 26px', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
                     <button onClick={() => this.setState({ help: false })} title="Close" className="mcs-close" style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, background: 'transparent', border: 'none', cursor: 'pointer', color: '#8a93a8', fontFamily: MONO, fontSize: 14, padding: 0 }}>✕</button>
 
