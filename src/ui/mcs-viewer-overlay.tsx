@@ -58,6 +58,7 @@ type State = {
     capturing: boolean,
     help: boolean,
     menu: boolean,
+    attribution: boolean,   // model-title attribution modal (author / license / source)
     fullscreen: boolean
 };
 
@@ -93,21 +94,21 @@ class McsViewerOverlay extends React.Component<Props, State> {
 
     constructor(props: Props) {
         super(props);
-        this.state = { passesMode: false, expandedPass: null, gpuWipe: false, passImages: [], capturing: false, help: false, menu: false, fullscreen: false };
+        this.state = { passesMode: false, expandedPass: null, gpuWipe: false, passImages: [], capturing: false, help: false, menu: false, attribution: false, fullscreen: false };
     }
 
     componentDidMount(): void {
         this._onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                if (this.state.menu || this.state.help) {
-                    this.setState({ help: false, menu: false });
+                if (this.state.menu || this.state.help || this.state.attribution) {
+                    this.setState({ help: false, menu: false, attribution: false });
                 } else if (this.state.expandedPass) {
                     this.setState({ expandedPass: null });   // collapse first
                 } else if (this.state.passesMode) {
                     this.setPasses(false);                   // then exit passes
                 }
             }
-            if (e.key === ' ' && !this.state.help) {
+            if (e.key === ' ' && !this.state.help && !this.state.attribution) {
                 e.preventDefault();
                 this.togglePlay();
             }
@@ -302,6 +303,7 @@ class McsViewerOverlay extends React.Component<Props, State> {
                 {this.renderTopRight(asset)}
                 {this.renderAnimBar()}
                 {this.renderHelp()}
+                {this.renderAttribution(asset)}
             </div>
         );
     }
@@ -323,9 +325,10 @@ class McsViewerOverlay extends React.Component<Props, State> {
         return (
             <div style={{ position: 'absolute', top: 18, right: 18, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 14 }}>
                 <div style={{ textAlign: 'right', pointerEvents: 'auto' }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '0.02em' }}>{asset}</div>
-                    <div style={{ marginTop: 3, fontFamily: MONO, fontSize: 10, letterSpacing: '0.14em', color: '#8a93a8' }}>
-                        MCS DECK · <a href="https://megacity.studio" target="_blank" rel="noreferrer" className="mcs-link" style={{ color: '#d6a64b', textDecoration: 'none' }}>MEGACITY.STUDIO</a>
+                    <div onClick={() => this.setState({ attribution: true })} className="mcs-link" title="Attribution & source" style={{ fontSize: 15, fontWeight: 600, letterSpacing: '0.02em', cursor: 'pointer' }}>{asset}</div>
+                    <div style={{ marginTop: 3, fontFamily: MONO, fontSize: 10, letterSpacing: '0.14em', color: '#8a93a8', display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: '0.4em', maxWidth: 380 }}>
+                        <span title={this.props.observerData.scene.author || 'MCS DECKS'} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{this.props.observerData.scene.author || 'MCS DECKS'}</span>
+                        <span style={{ flexShrink: 0 }}>· <a href="https://megacity.studio" target="_blank" rel="noreferrer" className="mcs-link" style={{ color: '#d6a64b', textDecoration: 'none' }}>MEGACITY.STUDIO</a></span>
                     </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -594,6 +597,46 @@ class McsViewerOverlay extends React.Component<Props, State> {
                         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '0.30em', marginLeft: '0.30em' }}>MEGACITY <span style={{ color: '#d6a64b' }}>VIEWER</span></div>
                         <a href="https://megacity.studio" target="_blank" rel="noreferrer" className="mcs-link" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.14em', color: '#8a93a8', textDecoration: 'none' }}>MEGACITY.STUDIO</a>
                     </div>
+                </div>
+            </div>
+        );
+    }
+
+    // attribution modal (opens on model-title click): author / license / source read from
+    // the glTF asset metadata (scene.attribution) — for CC-BY-style credit.
+    renderAttribution(asset: string) {
+        if (!this.state.attribution) return null;
+        let info: any = {};
+        try { info = JSON.parse(this.props.observerData.scene.attribution || '{}'); } catch (e) { /* */ }
+        const author = info.author || this.props.observerData.scene.author || 'MCS DECKS';
+        const title = info.title || asset;
+        const close = () => this.setState({ attribution: false });
+        const label: React.CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: '0.16em', color: '#8a93a8', whiteSpace: 'nowrap' };
+        const val: React.CSSProperties = { fontSize: 14, color: '#e7ecf6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 };
+        const link: React.CSSProperties = { color: '#d6a64b', textDecoration: 'none' };
+        let host = '';
+        try { host = info.source ? new URL(info.source).hostname.replace(/^www\./, '') : ''; } catch (e) { /* */ }
+        const rows: Array<[string, React.ReactNode]> = [
+            ['AUTHOR', info.authorUrl ? <a href={info.authorUrl} target="_blank" rel="noreferrer" className="mcs-link" style={link}>{author}</a> : author]
+        ];
+        if (info.license) rows.push(['LICENSE', info.licenseUrl ? <a href={info.licenseUrl} target="_blank" rel="noreferrer" className="mcs-link" style={link}>{info.license}</a> : info.license]);
+        if (info.source) rows.push(['SOURCE', <a href={info.source} target="_blank" rel="noreferrer" className="mcs-link" style={link}>{`${host || 'View original'} ↗`}</a>]);
+
+        return (
+            <div onClick={close} style={{ position: 'absolute', inset: 0, zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4,6,10,0.18)', pointerEvents: 'auto' }}>
+                <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: 380, maxWidth: 'calc(100vw - 48px)', background: '#0f141d', border: '1px solid rgba(176,194,228,0.12)', borderRadius: 14, padding: '28px 30px 24px', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+                    <button onClick={close} title="Close" className="mcs-close" style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, background: 'transparent', border: 'none', cursor: 'pointer', color: '#8a93a8', fontFamily: MONO, fontSize: 14, padding: 0 }}>✕</button>
+                    <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.22em', color: '#8a93a8', marginBottom: 6 }}>ATTRIBUTION</div>
+                    <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '0.01em', marginBottom: 18, wordBreak: 'break-word' }}>{title}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px 16px', alignItems: 'baseline' }}>
+                        {rows.map(([k, node], i) => (
+                            <React.Fragment key={i}><div style={label}>{k}</div><div style={val}>{node}</div></React.Fragment>
+                        ))}
+                    </div>
+                    {!info.license && !info.source &&
+                        <div style={{ marginTop: 16, fontSize: 12, color: '#8a93a8', lineHeight: 1.6 }}>No embedded license or source in this asset.</div>}
+                    <div style={{ height: 1, background: 'rgba(176,194,228,0.12)', margin: '22px 0 16px' }} />
+                    <a href="https://megacity.studio" target="_blank" rel="noreferrer" className="mcs-link" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.14em', color: '#8a93a8', textDecoration: 'none' }}>MEGACITY.STUDIO</a>
                 </div>
             </div>
         );

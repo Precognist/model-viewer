@@ -121,6 +121,8 @@ const observerData: ObserverData = {
     scene: {
         urls: [],
         filenames: [],
+        author: '',
+        attribution: '{}',
         nodes: '[]',
         selectedNode: {
             path: '',

@@ -103,6 +103,8 @@ export interface ObserverData {
     scene: {
         urls: string[],
         filenames: string[],
+        author?: string,
+        attribution?: string,
         nodes: string,
         selectedNode: {
             path: string,

@@ -1361,6 +1361,11 @@ class Viewer {
                     this.observer.set('scene.filenames', this.observer.get('scene.filenames').concat(filenames));
                 }
 
+                // author/attribution from the glTF asset metadata (asset.extras.author or
+                // asset.copyright) — shown under the model name; falls back to MCS DECKS.
+                const modelFile = files.find(f => this.isModelFilename(f.filename));
+                this.extractAuthor(modelFile?.url ?? '');
+
                 // Show any warnings that occurred during loading
                 if (warnings.length > 0) {
                     // Log all warnings to console for full details
@@ -1891,6 +1896,47 @@ class Viewer {
         document.querySelector('#panel-left')?.classList.add('no-cta');
         document.querySelector('#application-canvas')?.classList.add('no-cta');
         document.querySelector('.load-button-panel')?.classList.add('hide');
+    }
+
+    // Read the glTF asset metadata (author/attribution) from the file bytes and publish it
+    // as scene.author. Prefers asset.extras.author, then asset.copyright. Works for .glb
+    // (parse the JSON chunk) and .gltf (plain JSON). The URL is already browser-cached from
+    // the load, so this re-fetch is cheap. Falls back to '' (overlay shows MCS DECKS).
+    async extractAuthor(url: string) {
+        let author = '';
+        let attribution = '{}';
+        try {
+            if (url && this.isModelFilename(url)) {
+                const buf = await (await fetch(url)).arrayBuffer();
+                const dv = new DataView(buf);
+                let json: any;
+                if (dv.byteLength >= 20 && dv.getUint32(0, true) === 0x46546C67) {   // 'glTF' → GLB
+                    const jsonLen = dv.getUint32(12, true);
+                    json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jsonLen)));
+                } else {
+                    json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf)));
+                }
+                const a = json?.asset ?? {};
+                const ex = a.extras ?? {};
+                // "Name (https://url)" → { text, url }
+                const split = (s: any) => {
+                    const m = String(s ?? '').match(/^(.*?)\s*\((https?:\/\/[^)]*)\)\s*$/);
+                    return m ? { text: m[1].trim(), url: m[2] } : { text: String(s ?? '').trim(), url: '' };
+                };
+                const au = split(ex.author ?? ex.Author ?? a.copyright);
+                const li = split(ex.license ?? ex.License);
+                author = au.text;
+                attribution = JSON.stringify({
+                    author: au.text, authorUrl: au.url,
+                    license: li.text, licenseUrl: li.url,
+                    source: String(ex.source ?? ex.Source ?? '').trim(),
+                    title: String(ex.title ?? ex.Title ?? '').trim(),
+                    generator: String(a.generator ?? '').trim()
+                });
+            }
+        } catch (e) { /* leave defaults */ }
+        this.observer.set('scene.author', author);
+        this.observer.set('scene.attribution', attribution);
     }
 
     // add a loaded asset to the scene
