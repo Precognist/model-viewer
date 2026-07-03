@@ -1918,17 +1918,21 @@ class Viewer {
                 }
                 const a = json?.asset ?? {};
                 const ex = a.extras ?? {};
-                // "Name (https://url)" → { text, url }
+                // "Name (https://url)" → { text, url }. Match only the trailing (url) group
+                // (no ambiguous `.*?\s*` lead-in — avoids super-linear regex backtracking).
                 const split = (s: any) => {
-                    const m = String(s ?? '').match(/^(.*?)\s*\((https?:\/\/[^)]*)\)\s*$/);
-                    return m ? { text: m[1].trim(), url: m[2] } : { text: String(s ?? '').trim(), url: '' };
+                    const str = String(s ?? '').trim();
+                    const m = str.match(/\((https?:\/\/[^)]*)\)\s*$/);
+                    return m ? { text: str.slice(0, m.index).trim(), url: m[1] } : { text: str, url: '' };
                 };
                 const au = split(ex.author ?? ex.Author ?? a.copyright);
                 const li = split(ex.license ?? ex.License);
                 author = au.text;
                 attribution = JSON.stringify({
-                    author: au.text, authorUrl: au.url,
-                    license: li.text, licenseUrl: li.url,
+                    author: au.text,
+                    authorUrl: au.url,
+                    license: li.text,
+                    licenseUrl: li.url,
                     source: String(ex.source ?? ex.Source ?? '').trim(),
                     title: String(ex.title ?? ex.Title ?? '').trim(),
                     generator: String(a.generator ?? '').trim()
