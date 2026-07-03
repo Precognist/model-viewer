@@ -607,7 +607,9 @@ class McsViewerOverlay extends React.Component<Props, State> {
     renderAttribution(asset: string) {
         if (!this.state.attribution) return null;
         let info: any = {};
-        try { info = JSON.parse(this.props.observerData.scene.attribution || '{}'); } catch (e) { /* */ }
+        try {
+            info = JSON.parse(this.props.observerData.scene.attribution || '{}');
+        } catch (e) { /* */ }
         const author = info.author || this.props.observerData.scene.author || 'MCS DECKS';
         const title = info.title || asset;
         const close = () => this.setState({ attribution: false });
@@ -615,7 +617,9 @@ class McsViewerOverlay extends React.Component<Props, State> {
         const val: React.CSSProperties = { fontSize: 14, color: '#e7ecf6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 };
         const link: React.CSSProperties = { color: '#d6a64b', textDecoration: 'none' };
         let host = '';
-        try { host = info.source ? new URL(info.source).hostname.replace(/^www\./, '') : ''; } catch (e) { /* */ }
+        try {
+            host = info.source ? new URL(info.source).hostname.replace(/^www\./, '') : '';
+        } catch (e) { /* */ }
         const rows: Array<[string, React.ReactNode]> = [
             ['AUTHOR', info.authorUrl ? <a href={info.authorUrl} target="_blank" rel="noreferrer" className="mcs-link" style={link}>{author}</a> : author]
         ];
