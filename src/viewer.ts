@@ -76,7 +76,9 @@ import { Multiframe } from './multiframe';
 import { PassesWipe } from './passes-wipe';
 import { Picker } from './picker';
 import { PngExporter } from './png-exporter';
-import { ShadowCatcher } from './shadow-catcher';
+// Shared render module — canonical copy lives in the engine (simulacrum-pc-viewer/src/render/),
+// synced here so the model-viewer stays TRUE TO THE ENGINE (same shadow code both sides).
+import { ShadowCatcher } from './render/shadowCatcher';
 import { File, HierarchyNode, MorphTargetData, SceneCamera } from './types';
 import { XRObjectPlacementController } from './xr-mode';
 import { MeshoptDecoder } from '../lib/meshopt_decoder.module.js';
