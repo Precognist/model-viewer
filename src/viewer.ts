@@ -43,7 +43,6 @@ import {
     Color,
     ContainerResource,
     Entity,
-    EnvLighting,
     GraphicsDevice,
     GraphNode,
     GSplatComponent,
@@ -76,9 +75,10 @@ import { Multiframe } from './multiframe';
 import { PassesWipe } from './passes-wipe';
 import { Picker } from './picker';
 import { PngExporter } from './png-exporter';
-// Shared render module — canonical copy lives in the engine (simulacrum-pc-viewer/src/render/),
-// synced here so the model-viewer stays TRUE TO THE ENGINE (same shadow code both sides).
+// Shared render modules — canonical copies live in the engine (simulacrum-pc-viewer/src/render/),
+// synced here so the model-viewer stays TRUE TO THE ENGINE (same shadow + env code both sides).
 import { ShadowCatcher } from './render/shadowCatcher';
+import { generateEnv } from './render/renderPipeline';
 import { File, HierarchyNode, MorphTargetData, SceneCamera } from './types';
 import { XRObjectPlacementController } from './xr-mode';
 import { MeshoptDecoder } from '../lib/meshopt_decoder.module.js';
@@ -685,15 +685,10 @@ class Viewer {
 
     // initialize the faces and prefiltered lighting data from the given
     // skybox texture, which is either a cubemap or equirect texture.
+    // Env-atlas generation is the SHARED render module (canonical in the engine's
+    // src/render/renderPipeline.ts) — the model-viewer stays true to the engine's lighting.
     private initSkybox(source: Texture) {
-        const skybox = EnvLighting.generateSkyboxCubemap(source);
-        const lighting = EnvLighting.generateLightingSource(source);
-        // The second options parameter should not be necessary but the TS declarations require it for now
-        const envAtlas = EnvLighting.generateAtlas(lighting, {});
-        lighting.destroy();
-        this.app.scene.envAtlas = envAtlas;
-        this.app.scene.skybox = skybox;
-
+        generateEnv(this.app, source);   // sets scene.envAtlas + scene.skybox
         this.renderNextFrame();
     }
 
